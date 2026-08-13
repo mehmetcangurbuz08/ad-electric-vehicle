@@ -12,7 +12,7 @@ repository = DashboardRepository(settings.data_path)
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
-    description="Washington EV demand and charging infrastructure analytics.",
+    description="Washington elektrikli araç, şarj istasyonu ve Census analizi.",
 )
 app.add_middleware(
     CORSMiddleware,
@@ -47,13 +47,14 @@ def dashboard() -> Dashboard:
 
 @app.get(f"{settings.api_prefix}/regions", response_model=list[Region])
 def regions(
-    minimum_priority: float = Query(default=0, ge=0, le=100),
+    minimum_vehicles: int = Query(default=0, ge=0),
+    without_charging: bool = Query(default=False),
     limit: int = Query(default=100, ge=1, le=500),
 ) -> list[Region]:
     items = (
         region
         for region in get_dashboard().regions
-        if region.priority_score >= minimum_priority
+        if region.vehicles >= minimum_vehicles
+        and (not without_charging or region.public_ports == 0)
     )
-    return sorted(items, key=lambda item: item.priority_score, reverse=True)[:limit]
-
+    return sorted(items, key=lambda item: item.vehicles, reverse=True)[:limit]

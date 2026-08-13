@@ -1,18 +1,19 @@
 # Dashboard veri sözleşmesi
 
-`data/processed/dashboard.json`, veri katmanı ile backend arasındaki versiyonlu
-sözleşmedir. Backend açılışta dosyayı doğrular; uyumsuz çıktı sessizce sunulmaz.
+`data/processed/dashboard.json`, veri pipeline'ı ile FastAPI arasındaki
+versiyonlu sözleşmedir. Güncel sürüm `3.0`dır.
 
-Üst alanlar:
+Ana bölümler:
 
-- `schemaVersion`: Bu sözleşmenin sürümü.
-- `metadata`: Üretim zamanı, veri modu ve kaynak açıklamaları.
-- `summary`: Dashboard KPI'ları.
+- `metadata`: Üretim zamanı, veri tanımları ve metodoloji uyarıları.
+- `summary`: EV, şarj sahası, port ve kapsama KPI'ları.
 - `vehicleTrend`: Mevcut filonun model yılı dağılımı.
-- `powertrain`: BEV/PHEV adetleri.
-- `brands`: En yaygın üreticiler.
-- `regions`: ZIP düzeyinde özellikler, küme ve öncelik skoru.
+- `powertrain`, `brands`, `models`: Araç pazarı kırılımları.
+- `chargingMix`, `networks`: Şarj teknolojisi ve operatör kırılımları.
+- `counties`: En büyük EV pazarlarında port kapsaması.
+- `regions`: ZIP bazında EV, port ve Census göstergeleri.
+- `correlations`, `incomeGroups`, `incomeScatter`: Census ilişki analizi.
+- `dataQuality`: Eksik/kapalı alanlar ve kaynak kapsamı.
 
-`metadata.mode` değeri `demo` ise ekrandaki rakamlar sunum tasarımı içindir ve
-analitik sonuç olarak kullanılamaz. Pipeline çalışınca değer `live` olur.
-
+Backend açılışta bu yapıyı Pydantic ile doğrular; sözleşmeye uymayan dosya
+sessizce servis edilmez.

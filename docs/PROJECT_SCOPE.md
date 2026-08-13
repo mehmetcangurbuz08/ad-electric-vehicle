@@ -1,73 +1,49 @@
-# Proje kapsamı ve analitik kararlar
+# Proje kapsamı
 
-## Yanıtlanacak iş sorusu
+## Araştırma soruları
 
-Washington'da yeni kamuya açık DC hızlı şarj kapasitesi için hangi ZIP Code'lar
-önceliklendirilmeli ve bu önerinin temel nedenleri nelerdir?
+- Washington'da kayıtlı elektrikli araçlar hangi bölgelerde yoğunlaşıyor?
+- Aktif ve kamuya açık şarj portları EV kayıtlarına göre nasıl dağılıyor?
+- Gelir, konut tipi ve işe gidiş göstergeleri EV yoğunluğuyla nasıl ilişkili?
 
-Bir bölge yüksek araç talebine, yetersiz mevcut porta, uzun işe gidiş süresine
-ve evde şarjı zorlaştıran çok birimli konut yoğunluğuna sahipse daha yüksek
-öncelik alır. Sonuç bir “kesin yatırım kararı” değil, saha incelemesi için kısa
-listedır.
+## Kullanılan kaynaklar
 
-## MVP çıktıları
+- Washington DOL Electric Vehicle Population Data
+- AFDC Alternative Fuel Stations 2024 snapshot
+- Census ACS 2024 5-Year B19013, B25024 ve S0801 tabloları
 
-1. Toplam EV, BEV/PHEV payı, kamuya açık port ve DC hızlı port KPI'ları.
-2. Model yılı dağılımı ve pozitif menzil kayıtlarında ortalama menzil.
-3. ZIP düzeyinde talep/arz haritası ve filtrelenebilir bölge tablosu.
-4. K-Means ile bölge segmentleri.
-5. 0–100 yatırım öncelik skoru ve her bölge için açıklanabilir öneri.
+Şarj toplamlarında yalnız `WA + ELEC + aktif + public` kayıtları kullanılır.
 
-## Veri kaynakları
+## Hesaplanan göstergeler
 
-| Kaynak | Kullanım | Anahtar |
-|---|---|---|
-| Washington DOL Electric Vehicle Population Data | Araç, tip, model yılı, menzil ve ZIP | Gerekmiyor |
-| NLR/AFDC Alternative Fuel Stations | İstasyon, Level 2 ve DC hızlı port arzı | `NREL_API_KEY` |
-| Census ACS 2024 5-year B19013 | Medyan hane geliri | `CENSUS_API_KEY` |
-| Census ACS 2024 5-year B25003/B25024 | Mülkiyet ve yapı tipi | `CENSUS_API_KEY` |
-| Census ACS 2024 5-year S0801 | Ortalama işe gidiş süresi | `CENSUS_API_KEY` |
+- ZIP başına kayıtlı EV, BEV oranı ve bilinen elektrikli menzil
+- Aktif kamu şarj sahası, Level 2 ve DC hızlı port sayısı
+- 1.000 EV başına kamu portu
+- 1.000 konut başına kayıtlı EV
+- Çok birimli konut payı
+- Medyan hane geliri
+- Evden çalışma, uzun işe gidiş ve ortalama işe gidiş süresi
 
-## Önemli metodoloji sınırları
+Şarj kapsaması keyfi bir puanla değil, doğrudan `1.000 EV başına port` değeri ve
+eyalet ortalamasıyla karşılaştırılır. Kamuya açık portu olmayan ZIP'ler ayrıca
+gösterilir.
 
-- DOL dosyası mevcut kayıtların anlık görüntüsüdür. `Model Year`, kayıt tarihi
-  değildir. Bu nedenle MVP grafiği “yıllara göre tarihsel EV benimsenmesi” diye
-  sunulamaz; yalnızca mevcut filonun **model yılı dağılımı** olarak adlandırılır.
-- Gerçek tarihsel büyüme ve üç yıllık tahmin için aylık DOL snapshot'ları veya
-  kayıt tarihi içeren başka bir seri biriktirilmelidir.
-- `Electric Range = 0` çoğunlukla bilinmeyen/değişen raporlama koşuludur; menzil
-  ortalamasından dışlanır. Bu işlem dashboard'da belirtilir.
-- `Base MSRP = 0` bilinmeyen değer kabul edilir. Gelir segmentini MSRP ile
-  adlandırmak yerine ACS medyan geliri kullanılır.
-- EV sayısı nüfusa bölünmeden yalnızca yoğunluk gösterir. Sonraki sürümde araç
-  veya hane sayısına göre normalize edilmiş benimseme oranı eklenmelidir.
-- Census ZCTA ile posta adresi ZIP Code aynı kavram değildir; birleşmeyen kayıtlar
-  veri kalite metriği olarak raporlanmalıdır.
-- K-Means kümeleri nedensellik göstermez. Öncelik skoru denetlenebilir bir
-  sıralama aracıdır; elektrik şebekesi kapasitesi, trafik akışı, parsel uygunluğu
-  ve maliyet verileri yatırım öncesi ayrıca incelenmelidir.
+## Korelasyon analizi
 
-## Öncelik skoru (MVP)
+ZIP/ZCTA düzeyindeki ilişkiler Spearman sıra korelasyonuyla hesaplanır. Çok küçük
+coğrafyalardaki aşırı oranların sonucu bozmasını azaltmak için 1.000 konut başına
+EV metriğinin üst yüzde 1'i korelasyon hesabından çıkarılır.
 
-Her bileşen ZIP'ler arasında 0–1 min-max ölçeklenir:
+Korelasyon bir neden-sonuç kanıtı değildir. Örneğin gelir ile EV yoğunluğu aynı
+yönde hareket etse bile gelirin tek başına EV alımına neden olduğu söylenemez.
 
-```text
-priority = 100 × (
-  0.35 × EV talebi
-  + 0.25 × şarj açığı
-  + 0.15 × çok birimli konut payı
-  + 0.15 × işe gidiş süresi
-  + 0.10 × son model araç payı
-)
-```
+## Sınırlar
 
-Şarj açığı, `EV / (kamuya açık port + 1)` üzerinden hesaplanır. Ağırlıklar ürün
-kararıdır ve dashboard'da görünür tutulmalıdır; saha uzmanlarıyla kalibre edilir.
-
-## Sonraki aşamalar
-
-- Washington ZIP/ZCTA sınır GeoJSON'u ile gerçek choropleth harita.
-- Aylık snapshot otomasyonu ve gerçek büyüme/forecast modeli.
-- Trafik hacmi, şebeke kapasitesi, ticari parsel ve kurulum maliyeti katmanları.
-- Model kartı, veri tazelik alarmı ve özellik katkısı açıklamaları.
-
+- `Model Year`, kayıt tarihi değildir.
+- `Electric Range = 0` bilinmeyen kabul edilir.
+- EV ve AFDC dosyaları aynı tarihin snapshot'ı değildir.
+- Posta ZIP kodu ile Census ZCTA aynı coğrafya değildir; yalnız eşleşen kodlar
+  birlikte analiz edilir.
+- Trafik, elektrik şebekesi kapasitesi, parsel uygunluğu ve maliyet verisi yoktur.
+- Bir ZIP'te port bulunması, portun bütün kullanıcılar için erişilebilir olduğu
+  anlamına gelmez.
