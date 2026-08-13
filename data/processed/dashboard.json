@@ -1,0 +1,123 @@
+{
+  "schemaVersion": "1.0",
+  "metadata": {
+    "mode": "demo",
+    "generatedAt": "2026-08-13T15:00:00Z",
+    "geography": "Washington, USA — ZIP/ZCTA level",
+    "trendDefinition": "Current registered fleet grouped by vehicle model year",
+    "caveats": [
+      "Demo values are illustrative and must not be used as analytical findings.",
+      "Model year is not registration year.",
+      "Zero electric-range and MSRP values are treated as unknown."
+    ]
+  },
+  "summary": {
+    "totalVehicles": 246800,
+    "bevShare": 80.8,
+    "chargingSites": 2135,
+    "publicPorts": 7560,
+    "dcFastPorts": 3150,
+    "priorityRegions": 3
+  },
+  "vehicleTrend": [
+    {"modelYear": 2015, "count": 2500, "avgRange": 83},
+    {"modelYear": 2016, "count": 4100, "avgRange": 91},
+    {"modelYear": 2017, "count": 6700, "avgRange": 109},
+    {"modelYear": 2018, "count": 10800, "avgRange": 132},
+    {"modelYear": 2019, "count": 15100, "avgRange": 151},
+    {"modelYear": 2020, "count": 18400, "avgRange": 171},
+    {"modelYear": 2021, "count": 26800, "avgRange": 188},
+    {"modelYear": 2022, "count": 38500, "avgRange": 205},
+    {"modelYear": 2023, "count": 52200, "avgRange": 219},
+    {"modelYear": 2024, "count": 47100, "avgRange": 228},
+    {"modelYear": 2025, "count": 21500, "avgRange": 236},
+    {"modelYear": 2026, "count": 3100, "avgRange": 241}
+  ],
+  "powertrain": [
+    {"type": "BEV", "count": 199400},
+    {"type": "PHEV", "count": 47400}
+  ],
+  "brands": [
+    {"make": "TESLA", "count": 104300},
+    {"make": "CHEVROLET", "count": 18300},
+    {"make": "NISSAN", "count": 15100},
+    {"make": "FORD", "count": 14700},
+    {"make": "KIA", "count": 12100},
+    {"make": "BMW", "count": 11200}
+  ],
+  "regions": [
+    {
+      "zipCode": "98115", "city": "Seattle", "county": "King",
+      "latitude": 47.685, "longitude": -122.292, "vehicles": 6840,
+      "bevShare": 84.2, "avgRange": 211.4, "medianIncome": 142500,
+      "avgCommuteMinutes": 29.8, "multifamilyShare": 48.5,
+      "publicPorts": 34, "dcFastPorts": 4, "cluster": 2,
+      "segment": "Yüksek talep / altyapı açığı", "priorityScore": 91.4,
+      "recommendation": "DC hızlı şarj için saha ve şebeke fizibilitesini başlat."
+    },
+    {
+      "zipCode": "98052", "city": "Redmond", "county": "King",
+      "latitude": 47.673, "longitude": -122.121, "vehicles": 7260,
+      "bevShare": 88.1, "avgRange": 224.7, "medianIncome": 156800,
+      "avgCommuteMinutes": 27.1, "multifamilyShare": 42.8,
+      "publicPorts": 58, "dcFastPorts": 10, "cluster": 2,
+      "segment": "Yüksek talep / altyapı açığı", "priorityScore": 86.7,
+      "recommendation": "DC hızlı şarj için saha ve şebeke fizibilitesini başlat."
+    },
+    {
+      "zipCode": "98006", "city": "Bellevue", "county": "King",
+      "latitude": 47.558, "longitude": -122.151, "vehicles": 6510,
+      "bevShare": 87.3, "avgRange": 220.1, "medianIncome": 171200,
+      "avgCommuteMinutes": 28.4, "multifamilyShare": 29.1,
+      "publicPorts": 43, "dcFastPorts": 6, "cluster": 2,
+      "segment": "Yüksek talep / altyapı açığı", "priorityScore": 79.2,
+      "recommendation": "DC hızlı şarj için saha ve şebeke fizibilitesini başlat."
+    },
+    {
+      "zipCode": "98405", "city": "Tacoma", "county": "Pierce",
+      "latitude": 47.248, "longitude": -122.468, "vehicles": 2890,
+      "bevShare": 76.8, "avgRange": 196.2, "medianIncome": 73200,
+      "avgCommuteMinutes": 28.9, "multifamilyShare": 46.2,
+      "publicPorts": 28, "dcFastPorts": 8, "cluster": 1,
+      "segment": "Gelişen talep bölgesi", "priorityScore": 67.8,
+      "recommendation": "Talep artışını izle; Level 2 ve seçili DC hızlı kapasiteyi değerlendir."
+    },
+    {
+      "zipCode": "98661", "city": "Vancouver", "county": "Clark",
+      "latitude": 45.639, "longitude": -122.625, "vehicles": 2410,
+      "bevShare": 74.9, "avgRange": 189.5, "medianIncome": 69700,
+      "avgCommuteMinutes": 27.6, "multifamilyShare": 39.4,
+      "publicPorts": 24, "dcFastPorts": 6, "cluster": 1,
+      "segment": "Gelişen talep bölgesi", "priorityScore": 61.3,
+      "recommendation": "Talep artışını izle; Level 2 ve seçili DC hızlı kapasiteyi değerlendir."
+    },
+    {
+      "zipCode": "99208", "city": "Spokane", "county": "Spokane",
+      "latitude": 47.738, "longitude": -117.432, "vehicles": 1960,
+      "bevShare": 71.5, "avgRange": 181.2, "medianIncome": 71800,
+      "avgCommuteMinutes": 23.3, "multifamilyShare": 25.6,
+      "publicPorts": 19, "dcFastPorts": 4, "cluster": 1,
+      "segment": "Gelişen talep bölgesi", "priorityScore": 56.9,
+      "recommendation": "Talep artışını izle; Level 2 ve seçili DC hızlı kapasiteyi değerlendir."
+    },
+    {
+      "zipCode": "98501", "city": "Olympia", "county": "Thurston",
+      "latitude": 47.007, "longitude": -122.884, "vehicles": 2180,
+      "bevShare": 78.2, "avgRange": 198.7, "medianIncome": 85500,
+      "avgCommuteMinutes": 24.2, "multifamilyShare": 30.4,
+      "publicPorts": 37, "dcFastPorts": 12, "cluster": 0,
+      "segment": "Mevcut kapasitesi dengeli", "priorityScore": 43.5,
+      "recommendation": "Mevcut kapasiteyi izle; kısa vadede yatırım önceliği düşük."
+    },
+    {
+      "zipCode": "98225", "city": "Bellingham", "county": "Whatcom",
+      "latitude": 48.753, "longitude": -122.478, "vehicles": 1730,
+      "bevShare": 77.6, "avgRange": 192.4, "medianIncome": 68100,
+      "avgCommuteMinutes": 20.7, "multifamilyShare": 52.1,
+      "publicPorts": 41, "dcFastPorts": 9, "cluster": 0,
+      "segment": "Mevcut kapasitesi dengeli", "priorityScore": 39.8,
+      "recommendation": "Mevcut kapasiteyi izle; kısa vadede yatırım önceliği düşük."
+    }
+  ]
+}
+
