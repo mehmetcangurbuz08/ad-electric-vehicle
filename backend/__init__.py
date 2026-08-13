@@ -1,2 +1,1 @@
-"""EV Infrastructure Intelligence backend package."""
-
+"""Washington electric vehicle analysis backend."""

@@ -42,7 +42,7 @@ def fetch_sources(settings: PipelineSettings) -> list[Path]:
         raise RuntimeError("CENSUS_API_KEY is required to fetch ACS data.")
 
     ev_path = settings.raw_dir / "wa_ev_population.csv"
-    stations_path = settings.raw_dir / "wa_charging_stations.csv"
+    stations_path = settings.raw_dir / "wa_fuel_station.csv"
     census_path = settings.raw_dir / "acs_zcta.csv"
 
     _download(settings.wa_ev_url, ev_path, params={})
@@ -81,4 +81,3 @@ def fetch_sources(settings: PipelineSettings) -> list[Path]:
         how="left",
     ).to_csv(census_path, index=False, quoting=csv.QUOTE_MINIMAL)
     return [ev_path, stations_path, census_path]
-
