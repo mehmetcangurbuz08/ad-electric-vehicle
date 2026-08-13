@@ -54,6 +54,33 @@ class ModelPoint(BaseModel):
     count: int = Field(ge=0)
 
 
+class RangeBandPoint(BaseModel):
+    band: str
+    count: int = Field(ge=0)
+
+
+class RangePowertrainPoint(AliasedModel):
+    type: Literal["BEV", "PHEV"]
+    known_count: int = Field(alias="knownCount", ge=0)
+    known_share: float = Field(alias="knownShare", ge=0, le=100)
+    median_range: float = Field(alias="medianRange", ge=0)
+    average_range: float = Field(alias="averageRange", ge=0)
+
+
+class RangeBrandPoint(AliasedModel):
+    make: str
+    known_count: int = Field(alias="knownCount", ge=0)
+    known_share: float = Field(alias="knownShare", ge=0, le=100)
+    median_range: float = Field(alias="medianRange", ge=0)
+
+
+class SourcePoint(BaseModel):
+    name: str
+    period: str
+    usage: str
+    url: str
+
+
 class ChargingMixPoint(BaseModel):
     type: Literal["Level 2", "DC Fast"]
     count: int = Field(ge=0)
@@ -122,6 +149,8 @@ class Region(AliasedModel):
     latitude: float
     longitude: float
     vehicles: int = Field(ge=0)
+    bev_vehicles: int = Field(alias="bevVehicles", ge=0)
+    phev_vehicles: int = Field(alias="phevVehicles", ge=0)
     bev_share: float = Field(alias="bevShare", ge=0, le=100)
     avg_range: float | None = Field(alias="avgRange", default=None, ge=0)
     known_range_share: float = Field(alias="knownRangeShare", ge=0, le=100)
@@ -150,6 +179,9 @@ class Dashboard(AliasedModel):
     powertrain: list[PowertrainPoint]
     brands: list[BrandPoint]
     models: list[ModelPoint]
+    range_bands: list[RangeBandPoint] = Field(alias="rangeBands")
+    range_by_powertrain: list[RangePowertrainPoint] = Field(alias="rangeByPowertrain")
+    range_by_brand: list[RangeBrandPoint] = Field(alias="rangeByBrand")
     charging_mix: list[ChargingMixPoint] = Field(alias="chargingMix")
     networks: list[NetworkPoint]
     counties: list[CountyPoint]
@@ -157,6 +189,7 @@ class Dashboard(AliasedModel):
     income_groups: list[IncomeGroupPoint] = Field(alias="incomeGroups")
     income_scatter: list[IncomeScatterPoint] = Field(alias="incomeScatter")
     data_quality: DataQuality = Field(alias="dataQuality")
+    sources: list[SourcePoint]
     regions: list[Region]
 
 

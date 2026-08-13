@@ -19,7 +19,7 @@ class DashboardContractTests(unittest.TestCase):
 
     def test_live_artifact_matches_contract(self) -> None:
         self.assertIsInstance(self.dashboard, Dashboard)
-        self.assertEqual(self.dashboard.schema_version, "3.0")
+        self.assertEqual(self.dashboard.schema_version, "4.0")
         self.assertEqual(self.dashboard.metadata.mode, "live")
 
     def test_summary_and_detail_are_consistent(self) -> None:
@@ -45,6 +45,21 @@ class DashboardContractTests(unittest.TestCase):
             self.dashboard.summary.public_ports,
             self.dashboard.summary.level2_ports + self.dashboard.summary.dc_fast_ports,
         )
+
+    def test_range_and_source_sections_are_present(self) -> None:
+        self.assertEqual(sum(item.count for item in self.dashboard.range_bands), self.dashboard.summary.total_vehicles)
+        self.assertEqual(len(self.dashboard.range_by_powertrain), 2)
+        self.assertEqual(len(self.dashboard.sources), 4)
+
+    def test_zcta_map_matches_dashboard_regions(self) -> None:
+        import json
+
+        map_path = PROJECT_ROOT / "web" / "public" / "data" / "wa_zcta.geojson"
+        geometry = json.loads(map_path.read_text(encoding="utf-8"))
+        mapped_zips = {feature["properties"]["zipCode"] for feature in geometry["features"]}
+        dashboard_zips = {region.zip_code for region in self.dashboard.regions}
+        self.assertGreater(len(mapped_zips), 500)
+        self.assertTrue(mapped_zips.issubset(dashboard_zips))
 
 
 if __name__ == "__main__":

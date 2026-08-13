@@ -5,6 +5,8 @@ export type Region = {
   latitude: number;
   longitude: number;
   vehicles: number;
+  bevVehicles: number;
+  phevVehicles: number;
   bevShare: number;
   avgRange: number | null;
   knownRangeShare: number;
@@ -52,6 +54,20 @@ export type Dashboard = {
   powertrain: Array<{ type: "BEV" | "PHEV" | "Other"; count: number }>;
   brands: Array<{ make: string; count: number }>;
   models: Array<{ model: string; count: number }>;
+  rangeBands: Array<{ band: string; count: number }>;
+  rangeByPowertrain: Array<{
+    type: "BEV" | "PHEV";
+    knownCount: number;
+    knownShare: number;
+    medianRange: number;
+    averageRange: number;
+  }>;
+  rangeByBrand: Array<{
+    make: string;
+    knownCount: number;
+    knownShare: number;
+    medianRange: number;
+  }>;
   chargingMix: Array<{ type: "Level 2" | "DC Fast"; count: number }>;
   networks: Array<{ network: string; sites: number; ports: number }>;
   counties: Array<{
@@ -99,5 +115,18 @@ export type Dashboard = {
     censusMatchedZips: number;
     completeCensusZips: number;
   };
+  sources: Array<{ name: string; period: string; usage: string; url: string }>;
   regions: Region[];
+};
+
+export type ZctaFeatureCollection = {
+  type: "FeatureCollection";
+  features: Array<{
+    type: "Feature";
+    properties: { zipCode: string };
+    geometry: {
+      type: "Polygon" | "MultiPolygon";
+      coordinates: number[][][] | number[][][][];
+    };
+  }>;
 };

@@ -38,7 +38,10 @@ class PipelineTransformTests(unittest.TestCase):
             }]
         )
 
-        regions, trend, powertrain, _, _, quality = _aggregate_ev(ev)
+        (
+            regions, trend, powertrain, _, _, range_bands,
+            range_by_powertrain, _, quality,
+        ) = _aggregate_ev(ev)
         supply = _aggregate_stations(station)
         combined = regions.merge(supply, on="zipCode", how="left")
         combined["housingUnits"] = 100
@@ -51,6 +54,8 @@ class PipelineTransformTests(unittest.TestCase):
         self.assertEqual(combined.iloc[0]["portsPer1kVehicles"], 2500)
         self.assertEqual(sum(item["count"] for item in powertrain), 2)
         self.assertEqual(quality["knownRangeRows"], 1)
+        self.assertEqual(sum(item["count"] for item in range_bands), 2)
+        self.assertEqual(range_by_powertrain[0]["knownCount"], 1)
         self.assertEqual(len(trend), 2)
 
 

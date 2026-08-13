@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { getDashboard } from "./api";
-import type { Dashboard, Region } from "./types";
+import type { Dashboard, Region, ZctaFeatureCollection } from "./types";
+
+type VehicleFilter = "ALL" | "BEV" | "PHEV";
 
 const compact = new Intl.NumberFormat("tr-TR", {
   notation: "compact",
@@ -72,50 +74,69 @@ function TrendChart({ data }: { data: Dashboard["vehicleTrend"] }) {
 
 function WashingtonMap({
   regions,
+  boundaries,
   selected,
+  activeZips,
+  vehicleFilter,
   onSelect,
 }: {
   regions: Region[];
+  boundaries: ZctaFeatureCollection;
   selected: Region;
+  activeZips: Set<string>;
+  vehicleFilter: VehicleFilter;
   onSelect: (region: Region) => void;
 }) {
-  const visible = regions.filter((region) => region.vehicles >= 100);
-  const project = (longitude: number, latitude: number) => ({
-    x: 32 + ((longitude + 125) / 8.3) * 576,
-    y: 24 + ((49.1 - latitude) / 3.7) * 262,
-  });
+  const byZip = new Map(regions.map((region) => [region.zipCode, region]));
+  const selectedVehicles = (region: Region) => vehicleFilter === "BEV"
+    ? region.bevVehicles
+    : vehicleFilter === "PHEV"
+      ? region.phevVehicles
+      : region.vehicles;
+  const project = ([longitude, latitude]: number[]) => [
+    18 + ((longitude + 125) / 8.3) * 604,
+    12 + ((49.1 - latitude) / 3.7) * 290,
+  ];
+  const polygonPath = (polygon: number[][][]) => polygon
+    .map((ring) => ring.map((point, index) => {
+      const [x, y] = project(point);
+      return `${index ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(" ") + " Z")
+    .join(" ");
+  const geometryPath = (feature: ZctaFeatureCollection["features"][number]) => {
+    if (feature.geometry.type === "Polygon") {
+      return polygonPath(feature.geometry.coordinates as number[][][]);
+    }
+    return (feature.geometry.coordinates as number[][][][])
+      .map((polygon) => polygonPath(polygon))
+      .join(" ");
+  };
 
   return (
     <div className="map-wrap">
       <svg viewBox="0 0 640 320" role="img" aria-label="Washington EV ve şarj kapsama haritası">
-        <path className="state" d="M33 30 L606 31 L598 238 L550 244 L505 278 L439 266 L394 288 L344 269 L288 286 L240 263 L192 279 L150 250 L100 258 L69 217 L56 165 L31 127 Z" />
-        <path className="map-line" d="M55 184 C180 150 265 174 375 149 S520 148 594 116" />
-        {visible.map((region) => {
-          const point = project(region.longitude, region.latitude);
-          const radius = 3 + Math.sqrt(region.vehicles) / 11;
+        {boundaries.features.map((feature) => {
+          const region = byZip.get(feature.properties.zipCode);
+          if (!region) return null;
+          const active = activeZips.has(region.zipCode);
           const className = region.publicPorts === 0
             ? "no-station"
             : region.coverageStatus === "Eyalet ortalamasının altında"
               ? "gap"
               : "covered";
           return (
-            <g
+            <path
               key={region.zipCode}
-              className="map-point"
+              d={geometryPath(feature)}
+              fillRule="evenodd"
+              className={`zcta ${className} ${active ? "active" : "muted"} ${selected.zipCode === region.zipCode ? "selected" : ""}`}
               onClick={() => onSelect(region)}
               role="button"
               tabIndex={0}
               onKeyDown={(event) => event.key === "Enter" && onSelect(region)}
             >
-              <circle cx={point.x} cy={point.y} r={radius + 4} className="pulse" />
-              <circle
-                cx={point.x}
-                cy={point.y}
-                r={radius}
-                className={`${className} ${selected.zipCode === region.zipCode ? "selected" : ""}`}
-              />
-              <title>{region.city} {region.zipCode} · {integer.format(region.vehicles)} EV · {region.publicPorts} port</title>
-            </g>
+              <title>{region.city} {region.zipCode} · {integer.format(selectedVehicles(region))} EV · {region.publicPorts} port</title>
+            </path>
           );
         })}
       </svg>
@@ -123,15 +144,21 @@ function WashingtonMap({
         <span className="legend-dot no-station" /> Kamuya açık port yok
         <span className="legend-dot gap" /> Eyalet ortalamasının altında
         <span className="legend-dot covered" /> Eyalet ortalamasının üzerinde
+        <span className="map-source">Census 2020 ZCTA · {boundaries.features.length}/{regions.length} ZIP eşleşti</span>
       </div>
     </div>
   );
 }
 
-function RegionDetail({ region }: { region: Region }) {
+function RegionDetail({ region, vehicleFilter }: { region: Region; vehicleFilter: VehicleFilter }) {
+  const vehicleCount = vehicleFilter === "BEV"
+    ? region.bevVehicles
+    : vehicleFilter === "PHEV"
+      ? region.phevVehicles
+      : region.vehicles;
   return (
     <aside className="region-detail">
-      <div className="region-count"><strong>{compact.format(region.vehicles)}</strong><span>kayıtlı EV</span></div>
+      <div className="region-count"><strong>{compact.format(vehicleCount)}</strong><span>{vehicleFilter === "ALL" ? "kayıtlı EV" : vehicleFilter}</span></div>
       <div>
         <span className="eyebrow">{region.zipCode} · {region.county} County</span>
         <h3>{region.city}</h3>
@@ -177,6 +204,21 @@ function Bars({
   );
 }
 
+function RangeBands({ rows }: { rows: Dashboard["rangeBands"] }) {
+  const maximum = Math.max(...rows.map((row) => row.count));
+  return (
+    <div className="range-bars">
+      {rows.map((row) => (
+        <div key={row.band}>
+          <span>{row.band === "Bilinmiyor" ? row.band : `${row.band} mil`}</span>
+          <div><i style={{ width: `${row.count / maximum * 100}%` }} /></div>
+          <strong>{integer.format(row.count)}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function IncomeScatter({ points }: { points: Dashboard["incomeScatter"] }) {
   const width = 640;
   const height = 290;
@@ -205,14 +247,25 @@ function IncomeScatter({ points }: { points: Dashboard["incomeScatter"] }) {
 
 export default function App() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
+  const [boundaries, setBoundaries] = useState<ZctaFeatureCollection | null>(null);
   const [error, setError] = useState("");
   const [selectedZip, setSelectedZip] = useState("");
+  const [county, setCounty] = useState("ALL");
+  const [vehicleFilter, setVehicleFilter] = useState<VehicleFilter>("ALL");
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
-    getDashboard(controller.signal)
-      .then((result) => {
+    Promise.all([
+      getDashboard(controller.signal),
+      fetch("/data/wa_zcta.geojson", { signal: controller.signal }).then((response) => {
+        if (!response.ok) throw new Error("ZIP sınır dosyası yüklenemedi.");
+        return response.json() as Promise<ZctaFeatureCollection>;
+      }),
+    ])
+      .then(([result, geojson]) => {
         setDashboard(result);
+        setBoundaries(geojson);
         setSelectedZip(result.regions[0]?.zipCode ?? "");
       })
       .catch((reason: Error) => reason.name !== "AbortError" && setError(reason.message));
@@ -223,16 +276,49 @@ export default function App() {
     () => dashboard?.regions.find((region) => region.zipCode === selectedZip) ?? dashboard?.regions[0],
     [dashboard, selectedZip],
   );
+  const counties = useMemo(
+    () => dashboard ? [...new Set(dashboard.regions.map((region) => region.county))].sort() : [],
+    [dashboard],
+  );
+  const filteredRegions = useMemo(() => {
+    if (!dashboard) return [];
+    const normalizedQuery = query.trim().toLocaleLowerCase("tr-TR");
+    return dashboard.regions.filter((region) => {
+      const count = vehicleFilter === "BEV"
+        ? region.bevVehicles
+        : vehicleFilter === "PHEV"
+          ? region.phevVehicles
+          : region.vehicles;
+      const matchesText = !normalizedQuery || [region.zipCode, region.city, region.county]
+        .some((value) => value.toLocaleLowerCase("tr-TR").includes(normalizedQuery));
+      return count > 0 && (county === "ALL" || region.county === county) && matchesText;
+    });
+  }, [dashboard, county, query, vehicleFilter]);
+  const activeZips = useMemo(
+    () => new Set(filteredRegions.map((region) => region.zipCode)),
+    [filteredRegions],
+  );
+
+  useEffect(() => {
+    if (filteredRegions.length > 0 && !activeZips.has(selectedZip)) {
+      setSelectedZip(filteredRegions[0].zipCode);
+    }
+  }, [activeZips, filteredRegions, selectedZip]);
 
   if (error) {
     return <main className="status"><div><span>API bağlantısı yok</span><h1>Dashboard yüklenemedi</h1><p>{error}</p><code>uvicorn backend.app.main:app --reload</code></div></main>;
   }
-  if (!dashboard || !selected) {
+  if (!dashboard || !selected || !boundaries) {
     return <main className="status"><div className="loader" /><p>Gerçek veri hazırlanıyor…</p></main>;
   }
 
   const totalPowertrain = dashboard.powertrain.reduce((sum, item) => sum + item.count, 0);
   const level2Share = dashboard.summary.level2Ports / dashboard.summary.publicPorts * 100;
+  const regionVehicleCount = (region: Region) => vehicleFilter === "BEV"
+    ? region.bevVehicles
+    : vehicleFilter === "PHEV"
+      ? region.phevVehicles
+      : region.vehicles;
 
   return (
     <div className="app-shell">
@@ -270,11 +356,40 @@ export default function App() {
           <article className="card map-card">
             <div className="section-head">
               <div><span className="eyebrow">Coğrafi dağılım</span><h2>EV sayısı ve şarj kapsaması</h2></div>
-              <span className="live-dot">Daire büyüklüğü = EV sayısı</span>
+              <span className="live-dot">ZIP/ZCTA sınırları</span>
+            </div>
+            <div className="map-filters">
+              <label>
+                <span>County</span>
+                <select value={county} onChange={(event) => setCounty(event.target.value)}>
+                  <option value="ALL">Tümü</option>
+                  {counties.map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>Araç tipi</span>
+                <select value={vehicleFilter} onChange={(event) => setVehicleFilter(event.target.value as VehicleFilter)}>
+                  <option value="ALL">BEV + PHEV</option>
+                  <option value="BEV">BEV</option>
+                  <option value="PHEV">PHEV</option>
+                </select>
+              </label>
+              <label className="search-field">
+                <span>ZIP veya şehir</span>
+                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Örn. 98038 veya Seattle" />
+              </label>
+              <div className="filter-count"><strong>{filteredRegions.length}</strong><span>bölge</span></div>
             </div>
             <div className="map-layout">
-              <WashingtonMap regions={dashboard.regions} selected={selected} onSelect={(region) => setSelectedZip(region.zipCode)} />
-              <RegionDetail region={selected} />
+              <WashingtonMap
+                regions={dashboard.regions}
+                boundaries={boundaries}
+                selected={selected}
+                activeZips={activeZips}
+                vehicleFilter={vehicleFilter}
+                onSelect={(region) => setSelectedZip(region.zipCode)}
+              />
+              <RegionDetail region={selected} vehicleFilter={vehicleFilter} />
             </div>
           </article>
 
@@ -335,6 +450,47 @@ export default function App() {
           </article>
         </section>
 
+        <section className="range-grid">
+          <article className="card range-card range-distribution">
+            <div className="section-head">
+              <div><span className="eyebrow">Kayıtlardaki menzil</span><h2>Elektrikli menzil dağılımı</h2></div>
+              <span>0 değeri bilinmiyor sayıldı</span>
+            </div>
+            <RangeBands rows={dashboard.rangeBands} />
+            <p className="chart-note">Karşılaştırmalar yalnız menzil alanı dolu kayıtlardan hesaplandı. Alanı 0 veya boş olan kayıtlar “Bilinmiyor” grubunda gösterildi.</p>
+          </article>
+
+          <article className="card range-card">
+            <div className="section-head"><div><span className="eyebrow">Araç tipi</span><h2>BEV ve PHEV menzili</h2></div></div>
+            <div className="range-summary">
+              {dashboard.rangeByPowertrain.map((item) => (
+                <div key={item.type}>
+                  <span>{item.type}</span>
+                  <strong>{decimal.format(item.medianRange)} mil</strong>
+                  <small>Medyan · {integer.format(item.knownCount)} kayıt</small>
+                  <i>Kayıtların %{decimal.format(item.knownShare)}’inde menzil var</i>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className="card range-card range-brands">
+            <div className="section-head">
+              <div><span className="eyebrow">Marka karşılaştırması</span><h2>Bilinen medyan menzil</h2></div>
+              <span>En az 100 dolu kayıt</span>
+            </div>
+            <div className="range-brand-list">
+              {dashboard.rangeByBrand.map((item) => (
+                <div key={item.make}>
+                  <strong>{item.make}</strong>
+                  <span>{decimal.format(item.medianRange)} mil</span>
+                  <small>{integer.format(item.knownCount)} kayıt · %{decimal.format(item.knownShare)} doluluk</small>
+                </div>
+              ))}
+            </div>
+          </article>
+        </section>
+
         <section className="census-grid">
           <article className="card scatter-card">
             <div className="section-head">
@@ -375,18 +531,18 @@ export default function App() {
 
         <section className="card table-card">
           <div className="section-head">
-            <div><span className="eyebrow">Şarj kapsaması</span><h2>Kamuya açık port bulunmayan büyük EV bölgeleri</h2></div>
-            <span>EV sayısına göre sıralı</span>
+            <div><span className="eyebrow">Şarj kapsaması</span><h2>Filtrelenen ZIP bölgeleri</h2></div>
+            <span>Portu olmayan bölgeler önce gösterilir</span>
           </div>
           <div className="table-scroll">
             <table>
               <thead><tr><th>Bölge</th><th>Durum</th><th>EV</th><th>Saha</th><th>Level 2</th><th>DC Fast</th><th>EV / 1K konut</th><th>Medyan gelir</th></tr></thead>
               <tbody>
-                {dashboard.regions.slice(0, 12).map((region) => (
+                {filteredRegions.slice(0, 12).map((region) => (
                   <tr key={region.zipCode} onClick={() => setSelectedZip(region.zipCode)}>
                     <td><strong>{region.city}</strong><span>{region.zipCode} · {region.county}</span></td>
                     <td>{region.coverageStatus}</td>
-                    <td>{integer.format(region.vehicles)}</td>
+                    <td>{integer.format(regionVehicleCount(region))}</td>
                     <td>{integer.format(region.chargingSites)}</td>
                     <td>{integer.format(region.level2Ports)}</td>
                     <td>{integer.format(region.dcFastPorts)}</td>
@@ -394,6 +550,9 @@ export default function App() {
                     <td>{region.medianIncome === null ? "—" : dollars.format(region.medianIncome)}</td>
                   </tr>
                 ))}
+                {filteredRegions.length === 0 && (
+                  <tr className="empty-row"><td colSpan={8}>Bu filtrelerle eşleşen ZIP bulunamadı.</td></tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -440,6 +599,22 @@ export default function App() {
             <span className="eyebrow">Notlar</span><h2>Sonuçları nasıl okumalıyız?</h2>
             <ul>{dashboard.metadata.caveats.map((caveat) => <li key={caveat}>{caveat}</li>)}</ul>
           </article>
+        </section>
+
+        <section className="card sources-card">
+          <div className="section-head">
+            <div><span className="eyebrow">Kaynaklar</span><h2>Veri ve tarih bilgisi</h2></div>
+            <span>Çıktı: {new Date(dashboard.metadata.generatedAt).toLocaleString("tr-TR")}</span>
+          </div>
+          <div className="source-list">
+            {dashboard.sources.map((source) => (
+              <div key={source.name}>
+                <a href={source.url} target="_blank" rel="noreferrer">{source.name}</a>
+                <span>{source.period}</span>
+                <p>{source.usage}</p>
+              </div>
+            ))}
+          </div>
         </section>
       </main>
 

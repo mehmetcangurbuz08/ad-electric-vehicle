@@ -9,6 +9,7 @@ Washington eyaletindeki kayıtlı elektrikli araç talebi ile aktif, kamuya aç�
 - AFDC Alternative Fuel Stations 2024 snapshot: aktif, kamuya açık, elektrikli
   istasyonlar ile Level 2/DC hızlı port sayıları.
 - 2024 Census ACS: medyan gelir, konut tipi ve işe gidiş göstergeleri.
+- Census 2020 ZCTA sınırları: gerçek ZIP/ZCTA harita geometrileri.
 
 Akış:
 
@@ -38,11 +39,13 @@ data/raw/wa_fuel_station.csv
 data/raw/wa_income.csv
 data/raw/wa_units.csv
 data/raw/wa_commuting.csv
+data/raw/cb_2020_us_zcta520_500k.zip
 ```
 
 ```powershell
 python -m pip install -r backend/requirements.txt -r data/requirements.txt
 python -m data.pipeline.cli build
+python -m data.pipeline.build_map
 ```
 
 Pipeline, şarj dosyasına şu filtreyi uygular:

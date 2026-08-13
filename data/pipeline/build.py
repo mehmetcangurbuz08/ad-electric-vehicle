@@ -55,7 +55,10 @@ def _load_sources(settings: PipelineSettings) -> tuple[pd.DataFrame, ...]:
 
 def _aggregate_ev(
     ev: pd.DataFrame,
-) -> tuple[pd.DataFrame, list[dict], list[dict], list[dict], list[dict], dict]:
+) -> tuple[
+    pd.DataFrame, list[dict], list[dict], list[dict], list[dict],
+    list[dict], list[dict], list[dict], dict,
+]:
     ev = ev.loc[ev["State"].eq("WA")].copy()
     ev["zipCode"] = _zip(ev["Postal Code"])
     ev["isBev"] = ev["Electric Vehicle Type"].eq(BEV_LABEL)
@@ -66,6 +69,7 @@ def _aggregate_ev(
     grouped = ev.dropna(subset=["zipCode"]).groupby("zipCode", observed=True)
     regions = grouped.agg(
         vehicles=("zipCode", "size"),
+        bevVehicles=("isBev", "sum"),
         bevShare=("isBev", lambda values: values.mean() * 100),
         avgRange=("rangeKnown", "mean"),
         knownRangeShare=("rangeKnown", lambda values: values.notna().mean() * 100),
@@ -111,6 +115,57 @@ def _aggregate_ev(
             .items()
         )
     ]
+    ev["rangeBand"] = pd.cut(
+        _numeric(ev["Electric Range"]).fillna(0),
+        bins=[-np.inf, 0, 50, 100, 200, 300, np.inf],
+        labels=["Bilinmiyor", "1–50", "51–100", "101–200", "201–300", "301+"],
+    )
+    range_bands = [
+        {"band": str(band), "count": int(count)}
+        for band, count in ev["rangeBand"].value_counts(sort=False).items()
+    ]
+    ev["powertrain"] = np.where(ev["isBev"], "BEV", "PHEV")
+    range_by_powertrain = [
+        {
+            "type": str(row.powertrain),
+            "knownCount": int(row.knownCount),
+            "knownShare": round(float(row.knownCount / row.totalCount * 100), 1),
+            "medianRange": round(float(row.medianRange), 1),
+            "averageRange": round(float(row.averageRange), 1),
+        }
+        for row in (
+            ev.groupby("powertrain", observed=True)
+            .agg(
+                totalCount=("powertrain", "size"),
+                knownCount=("rangeKnown", "count"),
+                medianRange=("rangeKnown", "median"),
+                averageRange=("rangeKnown", "mean"),
+            )
+            .reset_index()
+            .itertuples()
+        )
+    ]
+    range_by_brand_frame = (
+        ev.groupby("Make", observed=True)
+        .agg(
+            totalCount=("Make", "size"),
+            knownCount=("rangeKnown", "count"),
+            medianRange=("rangeKnown", "median"),
+        )
+        .reset_index()
+    )
+    range_by_brand_frame = range_by_brand_frame.loc[
+        range_by_brand_frame["knownCount"].ge(100)
+    ].sort_values("totalCount", ascending=False).head(10)
+    range_by_brand = [
+        {
+            "make": str(row.Make),
+            "knownCount": int(row.knownCount),
+            "knownShare": round(float(row.knownCount / row.totalCount * 100), 1),
+            "medianRange": round(float(row.medianRange), 1),
+        }
+        for row in range_by_brand_frame.itertuples()
+    ]
     quality = {
         "totalRows": int(len(ev)),
         "knownRangeRows": int(ev["rangeKnown"].notna().sum()),
@@ -121,7 +176,12 @@ def _aggregate_ev(
         "cityCount": int(ev["City"].nunique()),
         "countyCount": int(ev["County"].nunique()),
     }
-    return regions, trend, powertrain, brands, models, quality
+    regions["bevVehicles"] = regions["bevVehicles"].astype(int)
+    regions["phevVehicles"] = regions["vehicles"] - regions["bevVehicles"]
+    return (
+        regions, trend, powertrain, brands, models, range_bands,
+        range_by_powertrain, range_by_brand, quality,
+    )
 
 
 def _prepare_stations(stations: pd.DataFrame) -> pd.DataFrame:
@@ -352,7 +412,10 @@ def _county_rows(regions: pd.DataFrame) -> list[dict]:
 
 def build_dashboard(settings: PipelineSettings) -> str:
     ev, stations, income, units, commuting = _load_sources(settings)
-    regions, trend, powertrain, brands, models, ev_quality = _aggregate_ev(ev)
+    (
+        regions, trend, powertrain, brands, models, range_bands,
+        range_by_powertrain, range_by_brand, ev_quality,
+    ) = _aggregate_ev(ev)
     supply = _aggregate_stations(stations)
     census = _prepare_census(income, units, commuting)
     active_stations = _prepare_stations(stations)
@@ -375,6 +438,7 @@ def build_dashboard(settings: PipelineSettings) -> str:
 
     region_fields = [
         "zipCode", "city", "county", "latitude", "longitude", "vehicles",
+        "bevVehicles", "phevVehicles",
         "bevShare", "avgRange", "knownRangeShare", "chargingSites",
         "level2Ports", "dcFastPorts", "publicPorts", "portsPer1kVehicles",
         "evPerPort", "coverageStatus", "coverageNote", "medianIncome",
@@ -382,7 +446,8 @@ def build_dashboard(settings: PipelineSettings) -> str:
         "longCommuteShare", "avgCommuteMinutes", "evPer1kHousing",
     ]
     integer_fields = {
-        "vehicles", "chargingSites", "level2Ports", "dcFastPorts", "publicPorts"
+        "vehicles", "bevVehicles", "phevVehicles", "chargingSites",
+        "level2Ports", "dcFastPorts", "publicPorts"
     }
     regions = regions.sort_values(
         ["coverageOrder", "vehicles", "evPerPort"],
@@ -405,7 +470,7 @@ def build_dashboard(settings: PipelineSettings) -> str:
         region_records.append(clean)
 
     output = {
-        "schemaVersion": "3.0",
+        "schemaVersion": "4.0",
         "metadata": {
             "mode": "live",
             "generatedAt": datetime.now(timezone.utc).isoformat(),
@@ -440,6 +505,9 @@ def build_dashboard(settings: PipelineSettings) -> str:
         "powertrain": powertrain,
         "brands": brands,
         "models": models,
+        "rangeBands": range_bands,
+        "rangeByPowertrain": range_by_powertrain,
+        "rangeByBrand": range_by_brand,
         "chargingMix": charging_mix,
         "networks": networks,
         "counties": counties,
@@ -456,6 +524,34 @@ def build_dashboard(settings: PipelineSettings) -> str:
                 .shape[0]
             ),
         },
+        "sources": [
+            {
+                "name": "Washington DOL Electric Vehicle Population Data",
+                "period": "16 Temmuz 2026",
+                "usage": "Araç kayıtları, marka/model, model yılı, menzil ve ZIP",
+                "url": "https://data.wa.gov/Transportation/Electric-Vehicle-Population-Data/f6w7-q2d2/about_data",
+            },
+            {
+                "name": "AFDC Alternative Fuel Stations",
+                "period": pd.to_datetime(
+                    active_stations["Updated At"], errors="coerce", utc=True
+                ).max().date().isoformat(),
+                "usage": "Aktif kamuya açık Level 2 ve DC hızlı portlar",
+                "url": "https://developer.nrel.gov/docs/transportation/alt-fuel-stations-v1/all/",
+            },
+            {
+                "name": "Census ACS 2024 5-Year",
+                "period": "2024",
+                "usage": "Gelir, konut yapısı ve işe gidiş göstergeleri",
+                "url": "https://www.census.gov/data/developers/data-sets/acs-5year/2024.html",
+            },
+            {
+                "name": "Census 2020 ZCTA Cartographic Boundary",
+                "period": "2020 sınırları",
+                "usage": "ZIP/ZCTA harita geometrileri",
+                "url": "https://www.census.gov/geographies/mapping-files/2020/geo/carto-boundary-file.html",
+            },
+        ],
         "regions": region_records,
     }
     settings.processed_dir.mkdir(parents=True, exist_ok=True)
