@@ -3,7 +3,7 @@ import { getDashboard } from "./api";
 import type { Dashboard, Region, ZctaFeatureCollection } from "./types";
 
 type VehicleFilter = "ALL" | "BEV" | "PHEV";
-type DashboardView = "map" | "vehicles" | "charging" | "census" | "tables" | "notes" | "regression" | "clustering";
+type DashboardView = "map" | "vehicles" | "charging" | "census" | "tables" | "notes" | "regression" | "clustering" | "conclusion";
 
 const compact = new Intl.NumberFormat("en-US", {
   notation: "compact",
@@ -64,6 +64,12 @@ const analysisNavItems: Array<{ id: DashboardView; label: string; title: string;
     label: "Clusters",
     title: "K-Means area profiles",
     description: "Similar ZIP areas by EV density, public charging port density, and income.",
+  },
+  {
+    id: "conclusion",
+    label: "Conclusion",
+    title: "Conclusions and investment signals",
+    description: "Presentation summary of the main findings, infrastructure priorities, and next steps.",
   },
 ];
 
@@ -508,6 +514,16 @@ export default function App() {
   const activeNav = navItems.find((item) => item.id === activeView) ?? navItems[0];
   const regression = dashboard.analysis.regression;
   const clustering = dashboard.analysis.clustering;
+  const candidateRegions = [...dashboard.regions]
+    .filter((region) => region.vehicles > 0)
+    .sort((left, right) => {
+      if (left.publicPorts === 0 && right.publicPorts !== 0) return -1;
+      if (right.publicPorts === 0 && left.publicPorts !== 0) return 1;
+      return (right.evPerPort ?? right.vehicles) - (left.evPerPort ?? left.vehicles);
+    })
+    .slice(0, 6);
+  const limitedChargingCluster = [...clustering.clusters]
+    .sort((left, right) => (right.evPer1kHousing - right.portsPer1kHousing) - (left.evPer1kHousing - left.portsPer1kHousing))[0];
   const selectView = (view: DashboardView) => {
     setActiveView(view);
     const url = new URL(window.location.href);
@@ -926,6 +942,98 @@ export default function App() {
             </div>
           </article>
 
+        </section>
+
+        <section className="analysis-page conclusion-analysis">
+          <div className="conclusion-grid">
+            <article className="card conclusion-lead">
+              <span className="eyebrow">Final message</span>
+              <h2>EV adoption is growing unevenly, so charging investment should be targeted by ZIP-level demand.</h2>
+              <p>Washington has strong EV concentration in specific areas, but public charging availability does not always match local demand. The best investment signals come from combining vehicle registrations, public port density, and Census context.</p>
+            </article>
+
+            <article className="card conclusion-stat">
+              <span>Registered EVs</span>
+              <strong>{compact.format(dashboard.summary.totalVehicles)}</strong>
+              <small>Current Washington EV fleet in the dataset</small>
+            </article>
+            <article className="card conclusion-stat">
+              <span>Public ports</span>
+              <strong>{compact.format(dashboard.summary.publicPorts)}</strong>
+              <small>Level 2 and DC fast public charging ports</small>
+            </article>
+            <article className="card conclusion-stat">
+              <span>ZIPs without public charging</span>
+              <strong>{integer.format(dashboard.summary.zipsWithoutCharging)}</strong>
+              <small>Areas where public charging is absent</small>
+            </article>
+          </div>
+
+          <div className="conclusion-columns">
+            <article className="card conclusion-card">
+              <span className="eyebrow">Regression takeaway</span>
+              <h2>Socioeconomic signals explain part of EV density.</h2>
+              <p>The regression model uses income, housing structure, work-from-home share, and commute time to estimate EVs per 1,000 housing units.</p>
+              <dl>
+                <div><dt>R²</dt><dd>{regression.r2.toFixed(3)}</dd></div>
+                <div><dt>Average error</dt><dd>{decimal.format(regression.mae)} EV / 1K housing units</dd></div>
+                <div><dt>Main reading</dt><dd>Higher-income and flexible-work areas tend to show stronger EV density.</dd></div>
+              </dl>
+            </article>
+
+            <article className="card conclusion-card">
+              <span className="eyebrow">Clustering takeaway</span>
+              <h2>Not every area needs the same infrastructure strategy.</h2>
+              <p>K-Means groups ZIP areas by EV density, public charging density, and income. This turns hundreds of ZIPs into a few decision profiles.</p>
+              <dl>
+                <div><dt>Selected K</dt><dd>{clustering.selectedK}</dd></div>
+                <div><dt>High-gap profile</dt><dd>{limitedChargingCluster.label}</dd></div>
+                <div><dt>Action</dt><dd>Prioritize high-EV areas where public charging density is behind demand.</dd></div>
+              </dl>
+            </article>
+          </div>
+
+          <article className="card compact-table-card conclusion-table">
+            <div className="section-head">
+              <div><span className="eyebrow">Investment signals</span><h2>ZIP areas to review first</h2></div>
+              <span>No-port areas and high vehicles-per-port pressure</span>
+            </div>
+            <div className="table-scroll">
+              <table>
+                <thead><tr><th>Area</th><th>EVs</th><th>Public ports</th><th>Vehicles per port</th><th>Median income</th><th>Signal</th></tr></thead>
+                <tbody>{candidateRegions.map((region) => (
+                  <tr key={region.zipCode}>
+                    <td><strong>{region.city}</strong><span>{region.zipCode} · {region.county}</span></td>
+                    <td>{integer.format(region.vehicles)}</td>
+                    <td>{integer.format(region.publicPorts)}</td>
+                    <td>{region.evPerPort === null ? "No ports" : decimal.format(region.evPerPort)}</td>
+                    <td>{region.medianIncome === null ? "—" : dollars.format(region.medianIncome)}</td>
+                    <td>{region.publicPorts === 0 ? "Public charging gap" : "High port pressure"}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </article>
+
+          <div className="conclusion-columns">
+            <article className="card conclusion-card">
+              <span className="eyebrow">Recommended actions</span>
+              <ul>
+                <li>Prioritize DC fast charging in high-EV areas with limited public charging.</li>
+                <li>Support shared charging in dense multifamily housing areas where home charging is harder.</li>
+                <li>Use county and ZIP tables to compare demand before selecting specific sites.</li>
+              </ul>
+            </article>
+
+            <article className="card conclusion-card">
+              <span className="eyebrow">Future work</span>
+              <ul>
+                <li>Add traffic volume, grid capacity, land cost, and charger utilization data.</li>
+                <li>Use time-based registration snapshots for stronger forecasting.</li>
+                <li>Extend the model from descriptive planning to site-level scoring.</li>
+              </ul>
+            </article>
+          </div>
         </section>
 
         <section className="card sources-card">
