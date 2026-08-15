@@ -3,7 +3,7 @@ import { getDashboard } from "./api";
 import type { Dashboard, Region, ZctaFeatureCollection } from "./types";
 
 type VehicleFilter = "ALL" | "BEV" | "PHEV";
-type DashboardView = "overview" | "map" | "vehicles" | "charging" | "census" | "tables" | "notes";
+type DashboardView = "overview" | "map" | "vehicles" | "charging" | "census" | "tables" | "notes" | "regression" | "clustering";
 
 const compact = new Intl.NumberFormat("tr-TR", {
   notation: "compact",
@@ -13,7 +13,7 @@ const integer = new Intl.NumberFormat("tr-TR");
 const decimal = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 });
 const dollars = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
-const navItems: Array<{ id: DashboardView; label: string; title: string; description: string }> = [
+const dashboardNavItems: Array<{ id: DashboardView; label: string; title: string; description: string }> = [
   {
     id: "overview",
     label: "Özet",
@@ -57,6 +57,49 @@ const navItems: Array<{ id: DashboardView; label: string; title: string; descrip
     description: "Dashboard'da kullanılan veri setleri.",
   },
 ];
+
+const analysisNavItems: Array<{ id: DashboardView; label: string; title: string; description: string }> = [
+  {
+    id: "regression",
+    label: "Regresyon",
+    title: "Çoklu doğrusal regresyon",
+    description: "Gelir, konut yapısı ve işe gidiş göstergelerinin ZIP düzeyindeki EV yoğunluğuyla ilişkisi.",
+  },
+  {
+    id: "clustering",
+    label: "Kümeler",
+    title: "K-Means bölge profilleri",
+    description: "EV yoğunluğu, kamu şarj portu yoğunluğu ve gelire göre benzer ZIP bölgeleri.",
+  },
+];
+
+const navItems = [...dashboardNavItems, ...analysisNavItems];
+
+const initialView = (): DashboardView => {
+  const requested = new URLSearchParams(window.location.search).get("view") as DashboardView | null;
+  return requested && navItems.some((item) => item.id === requested) ? requested : "overview";
+};
+
+const projectPoint = ([longitude, latitude]: number[]) => [
+  18 + ((longitude + 125) / 8.3) * 604,
+  12 + ((49.1 - latitude) / 3.7) * 290,
+];
+
+const polygonPath = (polygon: number[][][]) => polygon
+  .map((ring) => ring.map((point, index) => {
+    const [x, y] = projectPoint(point);
+    return `${index ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ") + " Z")
+  .join(" ");
+
+const geometryPath = (feature: ZctaFeatureCollection["features"][number]) => {
+  if (feature.geometry.type === "Polygon") {
+    return polygonPath(feature.geometry.coordinates as number[][][]);
+  }
+  return (feature.geometry.coordinates as number[][][][])
+    .map((polygon) => polygonPath(polygon))
+    .join(" ");
+};
 
 function Kpi({ label, value, note }: { label: string; value: string; note: string }) {
   return (
@@ -139,25 +182,6 @@ function WashingtonMap({
     : vehicleFilter === "PHEV"
       ? region.phevVehicles
       : region.vehicles;
-  const project = ([longitude, latitude]: number[]) => [
-    18 + ((longitude + 125) / 8.3) * 604,
-    12 + ((49.1 - latitude) / 3.7) * 290,
-  ];
-  const polygonPath = (polygon: number[][][]) => polygon
-    .map((ring) => ring.map((point, index) => {
-      const [x, y] = project(point);
-      return `${index ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(" ") + " Z")
-    .join(" ");
-  const geometryPath = (feature: ZctaFeatureCollection["features"][number]) => {
-    if (feature.geometry.type === "Polygon") {
-      return polygonPath(feature.geometry.coordinates as number[][][]);
-    }
-    return (feature.geometry.coordinates as number[][][][])
-      .map((polygon) => polygonPath(polygon))
-      .join(" ");
-  };
-
   return (
     <div className="map-wrap">
       <svg viewBox="0 0 640 320" role="img" aria-label="Washington EV ve şarj kapsama haritası">
@@ -291,6 +315,132 @@ function IncomeScatter({ points }: { points: Dashboard["incomeScatter"] }) {
   );
 }
 
+function AnalysisMetric({ label, value, note }: { label: string; value: string; note: string }) {
+  return (
+    <article className="analysis-metric card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{note}</small>
+    </article>
+  );
+}
+
+function CoefficientChart({ rows }: { rows: Dashboard["analysis"]["regression"]["coefficients"] }) {
+  const maximum = Math.max(...rows.map((row) => Math.abs(row.coefficient)));
+  return (
+    <div className="coefficient-chart">
+      {rows.map((row) => (
+        <div key={row.key}>
+          <span>{row.label}</span>
+          <div className="coefficient-track">
+            <i
+              className={row.coefficient >= 0 ? "positive" : "negative"}
+              style={{ width: `${Math.abs(row.coefficient) / maximum * 100}%` }}
+            />
+          </div>
+          <strong className={row.coefficient >= 0 ? "positive" : "negative"}>
+            {row.coefficient > 0 ? "+" : ""}{decimal.format(row.coefficient)}
+          </strong>
+          <small>{row.interpretation}</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PredictionScatter({ rows }: { rows: Dashboard["analysis"]["regression"]["predictions"] }) {
+  const width = 720;
+  const height = 350;
+  const left = 52;
+  const bottom = 42;
+  const minimum = Math.min(0, ...rows.map((row) => row.predicted));
+  const maximum = Math.max(...rows.flatMap((row) => [row.actual, row.predicted]));
+  const x = (value: number) => left + ((value - minimum) / (maximum - minimum)) * (width - left - 20);
+  const y = (value: number) => height - bottom - ((value - minimum) / (maximum - minimum)) * (height - bottom - 18);
+  return (
+    <div className="model-scatter">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Gerçek ve tahmin edilen EV yoğunluğu">
+        {[0, .25, .5, .75, 1].map((tick) => {
+          const value = minimum + tick * (maximum - minimum);
+          return (
+            <g key={tick}>
+              <line x1={x(value)} x2={x(value)} y1="14" y2={height - bottom} className="grid-line" />
+              <line x1={left} x2={width - 16} y1={y(value)} y2={y(value)} className="grid-line" />
+              <text x={x(value)} y={height - 19} textAnchor="middle">{Math.round(value)}</text>
+              <text x={left - 8} y={y(value) + 3} textAnchor="end">{Math.round(value)}</text>
+            </g>
+          );
+        })}
+        <line x1={x(minimum)} y1={y(minimum)} x2={x(maximum)} y2={y(maximum)} className="identity-line" />
+        {rows.map((row) => (
+          <circle key={row.zipCode} cx={x(row.actual)} cy={y(row.predicted)} r="3" className="prediction-point">
+            <title>{row.city} {row.zipCode} · Gerçek {decimal.format(row.actual)} · Tahmin {decimal.format(row.predicted)}</title>
+          </circle>
+        ))}
+        <text x={width / 2} y={height - 2} textAnchor="middle">Gerçek EV / 1.000 konut</text>
+        <text transform={`translate(13 ${height / 2}) rotate(-90)`} textAnchor="middle">Tahmin EV / 1.000 konut</text>
+      </svg>
+    </div>
+  );
+}
+
+function ClusterSelectionChart({ rows, selectedK }: { rows: Dashboard["analysis"]["clustering"]["kEvaluation"]; selectedK: number }) {
+  const width = 520;
+  const height = 230;
+  const inset = 34;
+  const minimum = Math.min(...rows.map((row) => row.silhouette)) - .02;
+  const maximum = Math.max(...rows.map((row) => row.silhouette)) + .02;
+  const x = (index: number) => inset + index / Math.max(rows.length - 1, 1) * (width - inset * 2);
+  const y = (value: number) => height - inset - (value - minimum) / (maximum - minimum) * (height - inset * 2);
+  const path = rows.map((row, index) => `${index ? "L" : "M"}${x(index)},${y(row.silhouette)}`).join(" ");
+  return (
+    <div className="selection-chart">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="K değerlerine göre silhouette score">
+        <line x1={inset} x2={width - inset} y1={height - inset} y2={height - inset} className="axis" />
+        <path d={path} className="selection-line" />
+        {rows.map((row, index) => (
+          <g key={row.k}>
+            <circle cx={x(index)} cy={y(row.silhouette)} r={row.k === selectedK ? 7 : 5} className={row.k === selectedK ? "selected" : ""} />
+            <text x={x(index)} y={height - 11} textAnchor="middle">K={row.k}</text>
+            <text x={x(index)} y={y(row.silhouette) - 11} textAnchor="middle">{row.silhouette.toFixed(3)}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function ClusterMap({ boundaries, analysis }: { boundaries: ZctaFeatureCollection; analysis: Dashboard["analysis"]["clustering"] }) {
+  const assignments = new Map(analysis.assignments.map((row) => [row.zipCode, row]));
+  const colors = new Map(analysis.clusters.map((row) => [row.clusterId, row.color]));
+  return (
+    <div className="cluster-map">
+      <svg viewBox="0 0 640 320" role="img" aria-label="K-Means kümelerine göre Washington ZIP haritası">
+        {boundaries.features.map((feature) => {
+          const assignment = assignments.get(feature.properties.zipCode);
+          return (
+            <path
+              key={feature.properties.zipCode}
+              d={geometryPath(feature)}
+              fillRule="evenodd"
+              style={{ fill: assignment ? colors.get(assignment.clusterId) : "#dfe6ec" }}
+              className={assignment ? "cluster-zcta assigned" : "cluster-zcta"}
+            >
+              <title>{assignment ? `${assignment.city} ${assignment.zipCode} · ${assignment.clusterLabel} · ${assignment.evPer1kHousing} EV/1K konut` : `${feature.properties.zipCode} · Model örnekleminde yok`}</title>
+            </path>
+          );
+        })}
+      </svg>
+      <div className="cluster-legend">
+        {analysis.clusters.map((cluster) => (
+          <span key={cluster.clusterId}><i style={{ background: cluster.color }} />{cluster.label}</span>
+        ))}
+        <span><i className="unassigned" />Model dışında</span>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [boundaries, setBoundaries] = useState<ZctaFeatureCollection | null>(null);
@@ -299,7 +449,7 @@ export default function App() {
   const [county, setCounty] = useState("ALL");
   const [vehicleFilter, setVehicleFilter] = useState<VehicleFilter>("ALL");
   const [query, setQuery] = useState("");
-  const [activeView, setActiveView] = useState<DashboardView>("overview");
+  const [activeView, setActiveView] = useState<DashboardView>(initialView);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -367,18 +517,38 @@ export default function App() {
       ? region.phevVehicles
       : region.vehicles;
   const activeNav = navItems.find((item) => item.id === activeView) ?? navItems[0];
+  const regression = dashboard.analysis.regression;
+  const clustering = dashboard.analysis.clustering;
+  const selectView = (view: DashboardView) => {
+    setActiveView(view);
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", view);
+    window.history.replaceState({}, "", url);
+  };
 
   return (
     <div className={`dashboard-shell view-${activeView}`}>
       <aside className="sidebar">
-        <div className="sidebar-title">Dashboard</div>
+        <div className="sidebar-title">Washington EV</div>
         <nav>
-          {navItems.map((item) => (
+          <span className="nav-section">Dashboard</span>
+          {dashboardNavItems.map((item) => (
             <button
               key={item.id}
               className={activeView === item.id ? "active" : ""}
               type="button"
-              onClick={() => setActiveView(item.id)}
+              onClick={() => selectView(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+          <span className="nav-section analysis-label">Analizler</span>
+          {analysisNavItems.map((item) => (
+            <button
+              key={item.id}
+              className={activeView === item.id ? "active" : ""}
+              type="button"
+              onClick={() => selectView(item.id)}
             >
               {item.label}
             </button>
@@ -642,6 +812,150 @@ export default function App() {
               </tbody>
             </table>
           </div>
+        </section>
+
+        <section className="analysis-page regression-analysis">
+          <div className="analysis-toolbar">
+            <div>
+              <span className="eyebrow">Model sonucu</span>
+              <p>Sonuçlar gerçek veriden Python pipeline’ı tarafından yeniden üretilebilir.</p>
+            </div>
+            <a className="export-button" href={regression.exportUrl} download>Regresyon Excel raporu</a>
+          </div>
+
+          <div className="analysis-metrics">
+            <AnalysisMetric label="Çapraz doğrulanmış R²" value={regression.r2.toFixed(3)} note={`Model değişimin yaklaşık %${decimal.format(regression.r2 * 100)}’ini açıklıyor`} />
+            <AnalysisMetric label="MAE" value={decimal.format(regression.mae)} note="EV / 1.000 konut ortalama mutlak hata" />
+            <AnalysisMetric label="RMSE" value={decimal.format(regression.rmse)} note="Büyük hatalara daha fazla ağırlık verir" />
+            <AnalysisMetric label="Örneklem" value={integer.format(regression.sampleSize)} note={`${regression.completeRows} tam kayıttan, üst %1 hariç`} />
+          </div>
+
+          <article className="card formula-card">
+            <div><span className="eyebrow">Model denklemi</span><h2>EV yoğunluğu nasıl tahmin edildi?</h2></div>
+            <code>{regression.formula}</code>
+            <p><b>z(x)</b>, değişkenin ortalamadan kaç standart sapma uzakta olduğunu gösterir. Katsayılar, diğer değişkenler modelde tutulurken bir standart sapmalık değişimin tahminle ilişkisini verir.</p>
+          </article>
+
+          <div className="analysis-chart-grid">
+            <article className="card analysis-chart-card">
+              <div className="section-head">
+                <div><span className="eyebrow">Standartlaştırılmış katsayılar</span><h2>Değişkenlerin modeldeki yönü</h2></div>
+                <span>Pozitif değer birlikte artışı gösterir</span>
+              </div>
+              <CoefficientChart rows={regression.coefficients} />
+            </article>
+            <article className="card analysis-chart-card">
+              <div className="section-head">
+                <div><span className="eyebrow">5-fold tahminleri</span><h2>Gerçek değer ve model tahmini</h2></div>
+                <span>Kesikli çizgi kusursuz tahmin</span>
+              </div>
+              <PredictionScatter rows={regression.predictions} />
+            </article>
+          </div>
+
+          <div className="analysis-bottom-grid">
+            <article className="card method-card">
+              <span className="eyebrow">Ölçüleri okuma</span>
+              <h2>R² ve MAE ne söylüyor?</h2>
+              <dl>
+                <div><dt>R² = 1 − Σ(y−ŷ)² / Σ(y−ȳ)²</dt><dd>Modelin bölgeler arasındaki farklılığın ne kadarını açıklayabildiğini ölçer. 1’e yaklaşması daha güçlü açıklama demektir.</dd></div>
+                <div><dt>MAE = Σ|y−ŷ| / n</dt><dd>Modelin gerçek EV yoğunluğundan ortalama kaç EV/1.000 konut saptığını gösterir. Düşük olması iyidir.</dd></div>
+                <div><dt>5-fold cross-validation</dt><dd>Her ZIP bir kez eğitim verisinin dışında bırakılarak tahmin edildi; metrikler bu görmediği tahminlerden hesaplandı.</dd></div>
+              </dl>
+            </article>
+            <article className="card compact-table-card">
+              <div className="section-head"><div><span className="eyebrow">En büyük artıklar</span><h2>Modelin en çok zorlandığı ZIP’ler</h2></div></div>
+              <div className="table-scroll">
+                <table>
+                  <thead><tr><th>ZIP</th><th>Gerçek</th><th>Tahmin</th><th>Fark</th></tr></thead>
+                  <tbody>{regression.largestErrors.slice(0, 8).map((row) => (
+                    <tr key={row.zipCode}>
+                      <td><strong>{row.city}</strong><span>{row.zipCode} · {row.county}</span></td>
+                      <td>{decimal.format(row.actual)}</td>
+                      <td>{decimal.format(row.predicted)}</td>
+                      <td className={row.residual >= 0 ? "positive-text" : "negative-text"}>{row.residual > 0 ? "+" : ""}{decimal.format(row.residual)}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+
+        </section>
+
+        <section className="analysis-page clustering-analysis">
+          <div className="analysis-toolbar">
+            <div>
+              <span className="eyebrow">Model sonucu</span>
+              <p>Kümeler benzer bölge profillerini gösterir; isimler küme ortalamaları görüldükten sonra verildi.</p>
+            </div>
+            <a className="export-button" href={clustering.exportUrl} download>Kümeleme Excel raporu</a>
+          </div>
+
+          <div className="analysis-metrics">
+            <AnalysisMetric label="Seçilen küme sayısı" value={String(clustering.selectedK)} note="K=2–6 silhouette karşılaştırması" />
+            <AnalysisMetric label="Silhouette score" value={clustering.silhouetteScore.toFixed(3)} note="1’e yaklaştıkça ayrışma güçlenir" />
+            <AnalysisMetric label="Örneklem" value={integer.format(clustering.sampleSize)} note="Eksiksiz ve aykırı değerlerden temizlenmiş ZIP" />
+            <AnalysisMetric label="Kullanılan özellik" value={String(clustering.features.length)} note="EV yoğunluğu, port yoğunluğu ve gelir" />
+          </div>
+
+          <article className="card formula-card">
+            <div><span className="eyebrow">K-Means amaç fonksiyonu</span><h2>Benzer bölgeler nasıl bir araya getirildi?</h2></div>
+            <code>{clustering.formula}</code>
+            <p>Model, her ZIP ile ait olduğu küme merkezi arasındaki kareli uzaklıkların toplamını küçültür. Yoğunluklara <b>log(1+x)</b>, ardından bütün girdilere <b>z-skor</b> uygulandı.</p>
+            <div className="feature-pills">{clustering.features.map((feature) => <span key={feature.key}><b>{feature.label}</b><small>{feature.transform}</small></span>)}</div>
+          </article>
+
+          <div className="cluster-profile-grid">
+            {clustering.clusters.map((cluster) => (
+              <article className="card cluster-profile" key={cluster.clusterId} style={{ "--cluster-color": cluster.color } as CSSProperties}>
+                <div className="cluster-number">{cluster.clusterId}</div>
+                <span className="eyebrow">{cluster.zipCount} ZIP</span>
+                <h2>{cluster.label}</h2>
+                <p>{cluster.description}</p>
+                <dl>
+                  <div><dt>EV / 1K konut</dt><dd>{decimal.format(cluster.evPer1kHousing)}</dd></div>
+                  <div><dt>Port / 1K konut</dt><dd>{decimal.format(cluster.portsPer1kHousing)}</dd></div>
+                  <div><dt>Medyan gelir</dt><dd>{dollars.format(cluster.medianIncome)}</dd></div>
+                  <div><dt>Çok birimli konut</dt><dd>%{decimal.format(cluster.multifamilyShare)}</dd></div>
+                  <div><dt>İşe gidiş</dt><dd>{decimal.format(cluster.avgCommuteMinutes)} dk</dd></div>
+                  <div><dt>BEV payı</dt><dd>%{decimal.format(cluster.bevShare)}</dd></div>
+                </dl>
+              </article>
+            ))}
+          </div>
+
+          <div className="analysis-chart-grid cluster-charts">
+            <article className="card analysis-chart-card">
+              <div className="section-head"><div><span className="eyebrow">Coğrafi dağılım</span><h2>Kümelere göre ZIP haritası</h2></div><span>Census ZCTA sınırları</span></div>
+              <ClusterMap boundaries={boundaries} analysis={clustering} />
+            </article>
+            <article className="card analysis-chart-card">
+              <div className="section-head"><div><span className="eyebrow">K seçimi</span><h2>Silhouette karşılaştırması</h2></div><span>Yüksek değer daha net ayrışma</span></div>
+              <ClusterSelectionChart rows={clustering.kEvaluation} selectedK={clustering.selectedK} />
+              <p className="chart-note">En yüksek silhouette değeri K={clustering.selectedK} için elde edildi. Inertia ve bütün K sonuçları Excel raporunda yer alıyor.</p>
+            </article>
+          </div>
+
+          <article className="card compact-table-card cluster-table">
+            <div className="section-head"><div><span className="eyebrow">Bölge örnekleri</span><h2>Her kümedeki en büyük EV bölgeleri</h2></div><span>Toplam EV sayısına göre</span></div>
+            <div className="table-scroll">
+              <table>
+                <thead><tr><th>Bölge</th><th>Küme</th><th>EV</th><th>EV / 1K konut</th><th>Port / 1K konut</th><th>Medyan gelir</th></tr></thead>
+                <tbody>{clustering.clusters.flatMap((cluster) => clustering.assignments.filter((row) => row.clusterId === cluster.clusterId).slice(0, 5)).map((row) => (
+                  <tr key={row.zipCode}>
+                    <td><strong>{row.city}</strong><span>{row.zipCode} · {row.county}</span></td>
+                    <td><span className="cluster-table-label" style={{ "--cluster-color": clustering.clusters.find((cluster) => cluster.clusterId === row.clusterId)?.color } as CSSProperties}>{row.clusterLabel}</span></td>
+                    <td>{integer.format(row.vehicles)}</td>
+                    <td>{decimal.format(row.evPer1kHousing)}</td>
+                    <td>{decimal.format(row.portsPer1kHousing)}</td>
+                    <td>{dollars.format(row.medianIncome)}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </article>
+
         </section>
 
         <section className="card sources-card">

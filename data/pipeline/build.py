@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 
 from data.pipeline.config import PipelineSettings
+from data.pipeline.excel_export import export_model_workbooks
+from data.pipeline.modeling import build_models
 
 
 BEV_LABEL = "Battery Electric Vehicle (BEV)"
@@ -426,6 +428,7 @@ def build_dashboard(settings: PipelineSettings) -> str:
     for column in ["chargingSites", "level2Ports", "dcFastPorts", "publicPorts"]:
         regions[column] = regions[column].fillna(0)
     regions = _coverage(regions)
+    analysis, model_tables = build_models(regions)
 
     charging_mix, networks, station_quality = _station_charts(stations)
     counties = _county_rows(regions)
@@ -470,7 +473,7 @@ def build_dashboard(settings: PipelineSettings) -> str:
         region_records.append(clean)
 
     output = {
-        "schemaVersion": "4.0",
+        "schemaVersion": "5.0",
         "metadata": {
             "mode": "live",
             "generatedAt": datetime.now(timezone.utc).isoformat(),
@@ -514,6 +517,7 @@ def build_dashboard(settings: PipelineSettings) -> str:
         "correlations": correlations,
         "incomeGroups": income_groups,
         "incomeScatter": income_scatter,
+        "analysis": analysis,
         "dataQuality": {
             **ev_quality,
             **station_quality,
@@ -558,4 +562,5 @@ def build_dashboard(settings: PipelineSettings) -> str:
     destination = settings.processed_dir / "dashboard.json"
     with destination.open("w", encoding="utf-8") as target:
         json.dump(output, target, ensure_ascii=False, indent=2)
+    export_model_workbooks(analysis, model_tables, settings.exports_dir)
     return str(destination)

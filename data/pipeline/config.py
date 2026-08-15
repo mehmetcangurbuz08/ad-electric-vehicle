@@ -13,6 +13,7 @@ class PipelineSettings:
     raw_dir: Path = PROJECT_ROOT / "data" / "raw"
     processed_dir: Path = PROJECT_ROOT / "data" / "processed"
     models_dir: Path = PROJECT_ROOT / "data" / "models"
+    exports_dir: Path = PROJECT_ROOT / "web" / "public" / "exports"
     wa_ev_url: str = (
         "https://data.wa.gov/api/v3/views/f6w7-q2d2/export.csv?accessType=DOWNLOAD"
     )
@@ -26,4 +27,3 @@ class PipelineSettings:
 
 
 settings = PipelineSettings()
-
