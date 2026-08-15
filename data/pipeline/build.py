@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 
 from data.pipeline.config import PipelineSettings
+from data.pipeline.excel_export import export_model_workbooks
+from data.pipeline.modeling import build_models
 
 
 BEV_LABEL = "Battery Electric Vehicle (BEV)"
@@ -118,7 +120,7 @@ def _aggregate_ev(
     ev["rangeBand"] = pd.cut(
         _numeric(ev["Electric Range"]).fillna(0),
         bins=[-np.inf, 0, 50, 100, 200, 300, np.inf],
-        labels=["Bilinmiyor", "1–50", "51–100", "101–200", "201–300", "301+"],
+        labels=["Unknown", "1–50", "51–100", "101–200", "201–300", "301+"],
     )
     range_bands = [
         {"band": str(band), "count": int(count)}
@@ -262,20 +264,20 @@ def _coverage(regions: pd.DataFrame) -> pd.DataFrame:
     regions["evPerPort"] = regions["vehicles"] / regions["publicPorts"].replace(0, np.nan)
 
     statewide_ports_per_1k = regions["publicPorts"].sum() / regions["vehicles"].sum() * 1000
-    regions["coverageStatus"] = "Eyalet ortalamasının altında"
+    regions["coverageStatus"] = "Below state average"
     regions.loc[
         regions["portsPer1kVehicles"].ge(statewide_ports_per_1k), "coverageStatus"
     ] = (
-        "Eyalet ortalamasının üzerinde"
+        "Above state average"
     )
-    regions.loc[regions["publicPorts"].eq(0), "coverageStatus"] = "Kamuya açık port yok"
+    regions.loc[regions["publicPorts"].eq(0), "coverageStatus"] = "No public ports"
 
     def note(row: pd.Series) -> str:
         if row["publicPorts"] == 0:
-            return "Bu ZIP içinde aktif ve kamuya açık Level 2 veya DC hızlı port bulunmuyor."
+            return "This ZIP has no active public Level 2 or DC fast ports."
         if row["dcFastPorts"] == 0:
-            return "Kamuya açık şarj var, ancak DC hızlı port bulunmuyor."
-        return "Bu ZIP içinde hem Level 2 hem de DC hızlı şarj kapasitesi bulunuyor."
+            return "Public charging is available, but there are no DC fast ports."
+        return "This ZIP has both Level 2 and DC fast charging capacity."
 
     regions["coverageNote"] = regions.apply(note, axis=1)
     regions["evPer1kHousing"] = (
@@ -283,9 +285,9 @@ def _coverage(regions: pd.DataFrame) -> pd.DataFrame:
     )
     regions["coverageOrder"] = regions["coverageStatus"].map(
         {
-            "Kamuya açık port yok": 2,
-            "Eyalet ortalamasının altında": 1,
-            "Eyalet ortalamasının üzerinde": 0,
+            "No public ports": 2,
+            "Below state average": 1,
+            "Above state average": 0,
         }
     )
     return regions
@@ -293,10 +295,10 @@ def _coverage(regions: pd.DataFrame) -> pd.DataFrame:
 
 def _correlation_rows(regions: pd.DataFrame) -> tuple[list[dict], list[dict], list[dict]]:
     definitions = [
-        ("Medyan gelir", "medianIncome", "1.000 konut başına EV", "evPer1kHousing"),
-        ("Çok birimli konut oranı", "multifamilyShare", "1.000 konut başına EV", "evPer1kHousing"),
-        ("Evden çalışma oranı", "workFromHomeShare", "1.000 konut başına EV", "evPer1kHousing"),
-        ("Ortalama işe gidiş süresi", "avgCommuteMinutes", "1.000 konut başına EV", "evPer1kHousing"),
+        ("Median income", "medianIncome", "EVs per 1,000 housing units", "evPer1kHousing"),
+        ("Multifamily housing share", "multifamilyShare", "EVs per 1,000 housing units", "evPer1kHousing"),
+        ("Work-from-home share", "workFromHomeShare", "EVs per 1,000 housing units", "evPer1kHousing"),
+        ("Average commute time", "avgCommuteMinutes", "EVs per 1,000 housing units", "evPer1kHousing"),
     ]
     correlations: list[dict] = []
     for left_label, left, right_label, right in definitions:
@@ -318,7 +320,7 @@ def _correlation_rows(regions: pd.DataFrame) -> tuple[list[dict], list[dict], li
     income_sample["group"] = pd.qcut(
         income_sample["medianIncome"],
         4,
-        labels=["Düşük", "Orta-alt", "Orta-üst", "Yüksek"],
+        labels=["Low", "Lower-middle", "Upper-middle", "High"],
     )
     income_groups = [
         {
@@ -426,6 +428,7 @@ def build_dashboard(settings: PipelineSettings) -> str:
     for column in ["chargingSites", "level2Ports", "dcFastPorts", "publicPorts"]:
         regions[column] = regions[column].fillna(0)
     regions = _coverage(regions)
+    analysis, model_tables = build_models(regions)
 
     charging_mix, networks, station_quality = _station_charts(stations)
     counties = _county_rows(regions)
@@ -470,20 +473,20 @@ def build_dashboard(settings: PipelineSettings) -> str:
         region_records.append(clean)
 
     output = {
-        "schemaVersion": "4.0",
+        "schemaVersion": "5.0",
         "metadata": {
             "mode": "live",
             "generatedAt": datetime.now(timezone.utc).isoformat(),
-            "geography": "Washington, ABD — ZIP düzeyi",
-            "trendDefinition": "Mevcut EV kayıtlarının model yılına göre dağılımı",
-            "stationDefinition": "2024 AFDC dosyasındaki aktif ve kamuya açık elektrik istasyonları",
+            "geography": "Washington, USA - ZIP level",
+            "trendDefinition": "Distribution of current EV registrations by model year",
+            "stationDefinition": "Active public electric stations in the 2024 AFDC file",
             "caveats": [
-                "Model yılı kayıt yılı değildir; grafik geçmiş yıllardaki EV kayıt sayısını göstermez.",
-                "Electric Range değeri 0 olan kayıtlar menzil ortalamasına katılmadı.",
-                "EV ve istasyon dosyaları farklı tarihlere ait olduğu için karşılaştırmalar betimseldir.",
-                "Census ZCTA sınırları ile posta ZIP kodları birebir aynı değildir.",
-                "Korelasyon neden-sonuç göstermez; oranlardaki üst yüzde 1 aykırı değer çıkarıldı.",
-                "Trafik, şebeke kapasitesi, arsa uygunluğu ve kurulum maliyeti bu analizde yoktur.",
+                "Model year is not registration year; the chart does not show historical EV registration counts.",
+                "Records with Electric Range equal to 0 were excluded from range averages.",
+                "EV and station files come from different dates, so comparisons are descriptive.",
+                "Census ZCTA boundaries and postal ZIP codes are not identical.",
+                "Correlation does not prove causation; the top 1% outliers in ratio metrics were removed.",
+                "Traffic, grid capacity, parcel suitability, and installation cost are not included in this analysis.",
             ],
         },
         "summary": {
@@ -496,7 +499,7 @@ def build_dashboard(settings: PipelineSettings) -> str:
             "evPerPort": round(total_vehicles / public_ports, 1),
             "zipsWithoutCharging": int(regions["publicPorts"].eq(0).sum()),
             "belowAverageChargingZips": int(
-                regions["coverageStatus"].eq("Eyalet ortalamasının altında").sum()
+                regions["coverageStatus"].eq("Below state average").sum()
             ),
             "censusMatchedZips": int(regions["housingUnits"].notna().sum()),
             "knownRangeShare": ev_quality["knownRangeShare"],
@@ -514,6 +517,7 @@ def build_dashboard(settings: PipelineSettings) -> str:
         "correlations": correlations,
         "incomeGroups": income_groups,
         "incomeScatter": income_scatter,
+        "analysis": analysis,
         "dataQuality": {
             **ev_quality,
             **station_quality,
@@ -527,8 +531,8 @@ def build_dashboard(settings: PipelineSettings) -> str:
         "sources": [
             {
                 "name": "Washington DOL Electric Vehicle Population Data",
-                "period": "16 Temmuz 2026",
-                "usage": "Araç kayıtları, marka/model, model yılı, menzil ve ZIP",
+                "period": "July 16, 2026",
+                "usage": "Vehicle registrations, make/model, model year, range, and ZIP",
                 "url": "https://data.wa.gov/Transportation/Electric-Vehicle-Population-Data/f6w7-q2d2/about_data",
             },
             {
@@ -536,19 +540,19 @@ def build_dashboard(settings: PipelineSettings) -> str:
                 "period": pd.to_datetime(
                     active_stations["Updated At"], errors="coerce", utc=True
                 ).max().date().isoformat(),
-                "usage": "Aktif kamuya açık Level 2 ve DC hızlı portlar",
+                "usage": "Active public Level 2 and DC fast ports",
                 "url": "https://developer.nrel.gov/docs/transportation/alt-fuel-stations-v1/all/",
             },
             {
                 "name": "Census ACS 2024 5-Year",
                 "period": "2024",
-                "usage": "Gelir, konut yapısı ve işe gidiş göstergeleri",
+                "usage": "Income, housing structure, and commute indicators",
                 "url": "https://www.census.gov/data/developers/data-sets/acs-5year/2024.html",
             },
             {
-                "name": "Census 2020 ZCTA Cartographic Boundary",
-                "period": "2020 sınırları",
-                "usage": "ZIP/ZCTA harita geometrileri",
+                "name": "Census 2024 ZCTA Cartographic Boundary",
+                "period": "2024 boundaries",
+                "usage": "ZIP/ZCTA map geometries",
                 "url": "https://www.census.gov/geographies/mapping-files/2020/geo/carto-boundary-file.html",
             },
         ],
@@ -558,4 +562,5 @@ def build_dashboard(settings: PipelineSettings) -> str:
     destination = settings.processed_dir / "dashboard.json"
     with destination.open("w", encoding="utf-8") as target:
         json.dump(output, target, ensure_ascii=False, indent=2)
+    export_model_workbooks(analysis, model_tables, settings.exports_dir)
     return str(destination)

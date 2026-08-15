@@ -98,6 +98,95 @@ export type Dashboard = {
     medianIncome: number;
     evPer1kHousing: number;
   }>;
+  analysis: {
+    regression: {
+      method: string;
+      target: string;
+      sampleSize: number;
+      completeRows: number;
+      outlierThreshold: number;
+      r2: number;
+      mae: number;
+      rmse: number;
+      cvR2Mean: number;
+      cvR2Std: number;
+      intercept: number;
+      formula: string;
+      coefficients: Array<{
+        key: string;
+        label: string;
+        coefficient: number;
+        direction: "Positive" | "Negative";
+        mean: number;
+        standardDeviation: number;
+        interpretation: string;
+      }>;
+      predictions: Array<{
+        zipCode: string;
+        city: string;
+        county: string;
+        actual: number;
+        predicted: number;
+        residual: number;
+      }>;
+      largestErrors: Array<{
+        zipCode: string;
+        city: string;
+        county: string;
+        actual: number;
+        predicted: number;
+        residual: number;
+      }>;
+      notes: string[];
+      exportUrl: string;
+    };
+    clustering: {
+      method: string;
+      sampleSize: number;
+      completeRows: number;
+      selectedK: number;
+      silhouetteScore: number;
+      evOutlierThreshold: number;
+      portOutlierThreshold: number;
+      formula: string;
+      features: Array<{ key: string; label: string; transform: string }>;
+      kEvaluation: Array<{ k: number; inertia: number; silhouette: number }>;
+      clusters: Array<{
+        clusterId: number;
+        label: string;
+        color: string;
+        description: string;
+        zipCount: number;
+        evPer1kHousing: number;
+        portsPer1kHousing: number;
+        medianIncome: number;
+        multifamilyShare: number;
+        workFromHomeShare: number;
+        avgCommuteMinutes: number;
+        bevShare: number;
+        vehicles: number;
+        publicPorts: number;
+      }>;
+      assignments: Array<{
+        zipCode: string;
+        city: string;
+        county: string;
+        clusterId: number;
+        clusterLabel: string;
+        vehicles: number;
+        publicPorts: number;
+        evPer1kHousing: number;
+        portsPer1kHousing: number;
+        medianIncome: number;
+        multifamilyShare: number;
+        workFromHomeShare: number;
+        avgCommuteMinutes: number;
+        bevShare: number;
+      }>;
+      notes: string[];
+      exportUrl: string;
+    };
+  };
   dataQuality: {
     totalRows: number;
     knownRangeRows: number;

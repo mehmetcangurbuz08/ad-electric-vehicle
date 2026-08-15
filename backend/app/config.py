@@ -14,7 +14,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 @dataclass(frozen=True)
 class Settings:
-    app_name: str = "Washington Elektrikli Araç Analizi API"
+    app_name: str = "Washington Electric Vehicle Analysis API"
     api_prefix: str = "/api/v1"
     data_path: Path = PROJECT_ROOT / os.getenv(
         "EV_DATA_PATH", "data/processed/dashboard.json"

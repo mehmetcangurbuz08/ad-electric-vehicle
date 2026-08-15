@@ -12,7 +12,7 @@ repository = DashboardRepository(settings.data_path)
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
-    description="Washington elektrikli araç, şarj istasyonu ve Census analizi.",
+    description="Washington electric vehicle, charging station, and Census analysis.",
 )
 app.add_middleware(
     CORSMiddleware,

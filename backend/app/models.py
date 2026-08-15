@@ -124,6 +124,113 @@ class IncomeScatterPoint(AliasedModel):
     ev_per_1k_housing: float = Field(alias="evPer1kHousing", ge=0)
 
 
+class RegressionCoefficient(AliasedModel):
+    key: str
+    label: str
+    coefficient: float
+    direction: Literal["Pozitif", "Negatif"]
+    mean: float
+    standard_deviation: float = Field(alias="standardDeviation", gt=0)
+    interpretation: str
+
+
+class RegressionPrediction(AliasedModel):
+    zip_code: str = Field(alias="zipCode", pattern=r"^\d{5}$")
+    city: str
+    county: str
+    actual: float = Field(ge=0)
+    predicted: float
+    residual: float
+
+
+class RegressionAnalysis(AliasedModel):
+    method: str
+    target: str
+    sample_size: int = Field(alias="sampleSize", ge=1)
+    complete_rows: int = Field(alias="completeRows", ge=1)
+    outlier_threshold: float = Field(alias="outlierThreshold", ge=0)
+    r2: float
+    mae: float = Field(ge=0)
+    rmse: float = Field(ge=0)
+    cv_r2_mean: float = Field(alias="cvR2Mean")
+    cv_r2_std: float = Field(alias="cvR2Std", ge=0)
+    intercept: float
+    formula: str
+    coefficients: list[RegressionCoefficient]
+    predictions: list[RegressionPrediction]
+    largest_errors: list[RegressionPrediction] = Field(alias="largestErrors")
+    notes: list[str]
+    export_url: str = Field(alias="exportUrl")
+
+
+class ClusterFeature(BaseModel):
+    key: str
+    label: str
+    transform: str
+
+
+class ClusterKEvaluation(BaseModel):
+    k: int = Field(ge=2)
+    inertia: float = Field(ge=0)
+    silhouette: float = Field(ge=-1, le=1)
+
+
+class ClusterProfile(AliasedModel):
+    cluster_id: int = Field(alias="clusterId", ge=1)
+    label: str
+    color: str
+    description: str
+    zip_count: int = Field(alias="zipCount", ge=1)
+    ev_per_1k_housing: float = Field(alias="evPer1kHousing", ge=0)
+    ports_per_1k_housing: float = Field(alias="portsPer1kHousing", ge=0)
+    median_income: float = Field(alias="medianIncome", ge=0)
+    multifamily_share: float = Field(alias="multifamilyShare", ge=0, le=100)
+    work_from_home_share: float = Field(alias="workFromHomeShare", ge=0, le=100)
+    avg_commute_minutes: float = Field(alias="avgCommuteMinutes", ge=0)
+    bev_share: float = Field(alias="bevShare", ge=0, le=100)
+    vehicles: int = Field(ge=0)
+    public_ports: int = Field(alias="publicPorts", ge=0)
+
+
+class ClusterAssignment(AliasedModel):
+    zip_code: str = Field(alias="zipCode", pattern=r"^\d{5}$")
+    city: str
+    county: str
+    cluster_id: int = Field(alias="clusterId", ge=1)
+    cluster_label: str = Field(alias="clusterLabel")
+    vehicles: int = Field(ge=0)
+    public_ports: int = Field(alias="publicPorts", ge=0)
+    ev_per_1k_housing: float = Field(alias="evPer1kHousing", ge=0)
+    ports_per_1k_housing: float = Field(alias="portsPer1kHousing", ge=0)
+    median_income: float = Field(alias="medianIncome", ge=0)
+    multifamily_share: float = Field(alias="multifamilyShare", ge=0, le=100)
+    work_from_home_share: float = Field(alias="workFromHomeShare", ge=0, le=100)
+    avg_commute_minutes: float = Field(alias="avgCommuteMinutes", ge=0)
+    bev_share: float = Field(alias="bevShare", ge=0, le=100)
+
+
+class ClusteringAnalysis(AliasedModel):
+    method: str
+    sample_size: int = Field(alias="sampleSize", ge=1)
+    complete_rows: int = Field(alias="completeRows", ge=1)
+    selected_k: int = Field(alias="selectedK", ge=2)
+    silhouette_score: float = Field(alias="silhouetteScore", ge=-1, le=1)
+    ev_outlier_threshold: float = Field(alias="evOutlierThreshold", ge=0)
+    port_outlier_threshold: float = Field(alias="portOutlierThreshold", ge=0)
+    formula: str
+    features: list[ClusterFeature]
+    k_evaluation: list[ClusterKEvaluation] = Field(alias="kEvaluation")
+    clusters: list[ClusterProfile]
+    assignments: list[ClusterAssignment]
+    notes: list[str]
+    export_url: str = Field(alias="exportUrl")
+
+
+class ModelAnalysis(BaseModel):
+    regression: RegressionAnalysis
+    clustering: ClusteringAnalysis
+
+
 class DataQuality(AliasedModel):
     total_rows: int = Field(alias="totalRows", ge=0)
     known_range_rows: int = Field(alias="knownRangeRows", ge=0)
@@ -188,6 +295,7 @@ class Dashboard(AliasedModel):
     correlations: list[CorrelationPoint]
     income_groups: list[IncomeGroupPoint] = Field(alias="incomeGroups")
     income_scatter: list[IncomeScatterPoint] = Field(alias="incomeScatter")
+    analysis: ModelAnalysis
     data_quality: DataQuality = Field(alias="dataQuality")
     sources: list[SourcePoint]
     regions: list[Region]

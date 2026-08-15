@@ -1,49 +1,42 @@
-# Proje kapsamı
+# Project Scope
 
-## Araştırma soruları
+## Research Questions
 
-- Washington'da kayıtlı elektrikli araçlar hangi bölgelerde yoğunlaşıyor?
-- Aktif ve kamuya açık şarj portları EV kayıtlarına göre nasıl dağılıyor?
-- Gelir, konut tipi ve işe gidiş göstergeleri EV yoğunluğuyla nasıl ilişkili?
+- Where are registered electric vehicles concentrated in Washington?
+- How are active public charging ports distributed relative to EV registrations?
+- How are income, housing type, and commute indicators related to EV density?
 
-## Kullanılan kaynaklar
+## Data Sources
 
 - Washington DOL Electric Vehicle Population Data
 - AFDC Alternative Fuel Stations 2024 snapshot
-- Census ACS 2024 5-Year B19013, B25024 ve S0801 tabloları
+- Census ACS 2024 5-Year B19013, B25024, and S0801 tables
 
-Şarj toplamlarında yalnız `WA + ELEC + aktif + public` kayıtları kullanılır.
+Charging totals use only `WA + ELEC + active + public` records.
 
-## Hesaplanan göstergeler
+## Calculated Indicators
 
-- ZIP başına kayıtlı EV, BEV oranı ve bilinen elektrikli menzil
-- Aktif kamu şarj sahası, Level 2 ve DC hızlı port sayısı
-- 1.000 EV başına kamu portu
-- 1.000 konut başına kayıtlı EV
-- Çok birimli konut payı
-- Medyan hane geliri
-- Evden çalışma, uzun işe gidiş ve ortalama işe gidiş süresi
+- Registered EVs, battery electric share, and known electric range by ZIP
+- Active public charging sites, Level 2 ports, and DC fast ports
+- Public ports per 1,000 EVs
+- Registered EVs per 1,000 housing units
+- Multifamily housing share
+- Median household income
+- Work-from-home share, long-commute share, and average commute time
 
-Şarj kapsaması keyfi bir puanla değil, doğrudan `1.000 EV başına port` değeri ve
-eyalet ortalamasıyla karşılaştırılır. Kamuya açık portu olmayan ZIP'ler ayrıca
-gösterilir.
+Charging coverage is not an arbitrary score. It uses `ports per 1,000 EVs` and compares each ZIP to the statewide average. ZIPs with no public ports are shown separately.
 
-## Korelasyon analizi
+## Correlation Analysis
 
-ZIP/ZCTA düzeyindeki ilişkiler Spearman sıra korelasyonuyla hesaplanır. Çok küçük
-coğrafyalardaki aşırı oranların sonucu bozmasını azaltmak için 1.000 konut başına
-EV metriğinin üst yüzde 1'i korelasyon hesabından çıkarılır.
+ZIP/ZCTA-level relationships are calculated with Spearman rank correlation. To reduce distortion from very small geographies, the top 1% outliers in EVs per 1,000 housing units are removed from the correlation sample.
 
-Korelasyon bir neden-sonuç kanıtı değildir. Örneğin gelir ile EV yoğunluğu aynı
-yönde hareket etse bile gelirin tek başına EV alımına neden olduğu söylenemez.
+Correlation is not proof of causation. For example, even if income and EV density move in the same direction, this does not prove that income alone causes EV adoption.
 
-## Sınırlar
+## Limits
 
-- `Model Year`, kayıt tarihi değildir.
-- `Electric Range = 0` bilinmeyen kabul edilir.
-- EV ve AFDC dosyaları aynı tarihin snapshot'ı değildir.
-- Posta ZIP kodu ile Census ZCTA aynı coğrafya değildir; yalnız eşleşen kodlar
-  birlikte analiz edilir.
-- Trafik, elektrik şebekesi kapasitesi, parsel uygunluğu ve maliyet verisi yoktur.
-- Bir ZIP'te port bulunması, portun bütün kullanıcılar için erişilebilir olduğu
-  anlamına gelmez.
+- `Model Year` is not a registration date.
+- `Electric Range = 0` is treated as unknown.
+- EV and AFDC files are not snapshots from the same date.
+- Postal ZIP codes and Census ZCTAs are not identical geographies; only matching codes are analyzed together.
+- Traffic, grid capacity, parcel suitability, and cost data are not included.
+- Having ports in a ZIP does not guarantee that every user can access them.
