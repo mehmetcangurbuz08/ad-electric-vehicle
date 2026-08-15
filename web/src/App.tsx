@@ -3,6 +3,7 @@ import { getDashboard } from "./api";
 import type { Dashboard, Region, ZctaFeatureCollection } from "./types";
 
 type VehicleFilter = "ALL" | "BEV" | "PHEV";
+type DashboardView = "overview" | "map" | "vehicles" | "charging" | "census" | "tables" | "notes";
 
 const compact = new Intl.NumberFormat("tr-TR", {
   notation: "compact",
@@ -11,6 +12,51 @@ const compact = new Intl.NumberFormat("tr-TR", {
 const integer = new Intl.NumberFormat("tr-TR");
 const decimal = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 });
 const dollars = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+
+const navItems: Array<{ id: DashboardView; label: string; title: string; description: string }> = [
+  {
+    id: "overview",
+    label: "Özet",
+    title: "Washington EV Dashboard",
+    description: "DOL araç kayıtları, AFDC şarj istasyonları ve 2024 Census göstergelerinin ZIP düzeyindeki özeti.",
+  },
+  {
+    id: "map",
+    label: "Harita",
+    title: "EV sayısı ve şarj kapsaması",
+    description: "ZIP/ZCTA sınırları üzerinde araç yoğunluğu, port varlığı ve seçili bölge detayları.",
+  },
+  {
+    id: "vehicles",
+    label: "Araçlar",
+    title: "Araç filosu ve menzil dağılımı",
+    description: "Model yılı, BEV/PHEV karması, marka-model kırılımı ve bilinen elektrikli menzil göstergeleri.",
+  },
+  {
+    id: "charging",
+    label: "Şarj",
+    title: "Şarj ağı ve kapasite",
+    description: "Level 2/DC Fast port karması, operatörler ve kapsama farkları.",
+  },
+  {
+    id: "census",
+    label: "Census",
+    title: "Gelir, konut ve EV yoğunluğu",
+    description: "ACS göstergeleri ile ZIP düzeyinde EV sahipliği arasındaki ilişki.",
+  },
+  {
+    id: "tables",
+    label: "Tablolar",
+    title: "ZIP ve county karşılaştırmaları",
+    description: "Filtrelenen bölgeler ve county pazar büyüklükleri için sunuma uygun tablolar.",
+  },
+  {
+    id: "notes",
+    label: "Veri Notları",
+    title: "Veri kalitesi ve kaynaklar",
+    description: "Kapsam, sınırlılıklar, kaynaklar ve çıktı tarihi.",
+  },
+];
 
 function Kpi({ label, value, note }: { label: string; value: string; note: string }) {
   return (
@@ -253,6 +299,7 @@ export default function App() {
   const [county, setCounty] = useState("ALL");
   const [vehicleFilter, setVehicleFilter] = useState<VehicleFilter>("ALL");
   const [query, setQuery] = useState("");
+  const [activeView, setActiveView] = useState<DashboardView>("overview");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -319,9 +366,30 @@ export default function App() {
     : vehicleFilter === "PHEV"
       ? region.phevVehicles
       : region.vehicles;
+  const activeNav = navItems.find((item) => item.id === activeView) ?? navItems[0];
 
   return (
-    <div className="app-shell">
+    <div className={`dashboard-shell view-${activeView}`}>
+      <aside className="sidebar">
+        <div className="brand-mark"><span>EV</span><div>Washington<strong>Dashboard</strong></div></div>
+        <nav>
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              className={activeView === item.id ? "active" : ""}
+              type="button"
+              onClick={() => setActiveView(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-meta">
+          <span className="mode live">Gerçek veri</span>
+          <small>{dashboard.metadata.geography}</small>
+        </div>
+      </aside>
+      <div className="app-shell">
       <header>
         <div className="brand-mark"><span>EV</span><div>Washington<strong>Veri Analizi</strong></div></div>
         <div className="header-meta">
@@ -331,6 +399,11 @@ export default function App() {
       </header>
 
       <main>
+        <section className="page-title">
+          <span className="eyebrow">Washington eyaleti</span>
+          <h1>{activeNav.title}</h1>
+          <p>{activeNav.description}</p>
+        </section>
         <section className="hero">
           <div>
             <span className="eyebrow">Washington eyaleti</span>
@@ -622,6 +695,7 @@ export default function App() {
         <span>Washington Elektrikli Araç Analizi · Veri sözleşmesi v{dashboard.schemaVersion}</span>
         <span>AFDC son güncelleme: {new Date(dashboard.dataQuality.latestStationUpdate).toLocaleDateString("tr-TR")}</span>
       </footer>
+      </div>
     </div>
   );
 }
