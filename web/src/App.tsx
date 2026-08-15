@@ -3,7 +3,7 @@ import { getDashboard } from "./api";
 import type { Dashboard, Region, ZctaFeatureCollection } from "./types";
 
 type VehicleFilter = "ALL" | "BEV" | "PHEV";
-type DashboardView = "overview" | "map" | "vehicles" | "charging" | "census" | "tables" | "notes";
+type DashboardView = "map" | "vehicles" | "charging" | "census" | "tables" | "notes";
 
 const compact = new Intl.NumberFormat("tr-TR", {
   notation: "compact",
@@ -15,39 +15,33 @@ const dollars = new Intl.NumberFormat("en-US", { style: "currency", currency: "U
 
 const navItems: Array<{ id: DashboardView; label: string; title: string; description: string }> = [
   {
-    id: "overview",
-    label: "Özet",
-    title: "Genel Özet",
-    description: "DOL araç kayıtları, AFDC şarj istasyonları ve 2024 Census göstergelerinin ZIP düzeyindeki özeti.",
-  },
-  {
     id: "map",
-    label: "Harita",
-    title: "EV sayısı ve şarj kapsaması",
-    description: "ZIP/ZCTA sınırları üzerinde araç yoğunluğu, port varlığı ve seçili bölge detayları.",
+    label: "Map",
+    title: "Electric vehicle count and charging coverage",
+    description: "Vehicle density, public charging port availability, and selected area details by ZIP code area.",
   },
   {
     id: "vehicles",
-    label: "Araçlar",
-    title: "Araç filosu ve menzil dağılımı",
-    description: "Model yılı, BEV/PHEV karması, marka-model kırılımı ve bilinen elektrikli menzil göstergeleri.",
+    label: "Vehicles",
+    title: "Vehicle fleet and range distribution",
+    description: "Model year distribution, battery electric / plug-in hybrid mix, make-model breakdown, and known electric range indicators.",
   },
   {
     id: "charging",
     label: "Şarj",
     title: "Şarj ağı ve kapasite",
-    description: "Level 2/DC Fast port karması, operatörler ve kapsama farkları.",
+    description: "Orta hızlı ve hızlı şarj portu karması, operatörler ve kapsama farkları.",
   },
   {
     id: "census",
     label: "Census",
-    title: "Gelir, konut ve EV yoğunluğu",
-    description: "ACS göstergeleri ile ZIP düzeyinde EV sahipliği arasındaki ilişki.",
+    title: "Gelir, konut ve elektrikli araç yoğunluğu",
+    description: "American Community Survey göstergeleri ile posta kodu düzeyinde elektrikli araç sahipliği arasındaki ilişki.",
   },
   {
     id: "tables",
     label: "Tablolar",
-    title: "ZIP ve county karşılaştırmaları",
+    title: "Posta kodu ve county karşılaştırmaları",
     description: "Filtrelenen bölgeler ve county pazar büyüklükleri için sunuma uygun tablolar.",
   },
   {
@@ -57,16 +51,6 @@ const navItems: Array<{ id: DashboardView; label: string; title: string; descrip
     description: "Dashboard'da kullanılan veri setleri.",
   },
 ];
-
-function Kpi({ label, value, note }: { label: string; value: string; note: string }) {
-  return (
-    <article className="kpi card">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small>{note}</small>
-    </article>
-  );
-}
 
 function TrendChart({ data }: { data: Dashboard["vehicleTrend"] }) {
   const width = 760;
@@ -85,7 +69,7 @@ function TrendChart({ data }: { data: Dashboard["vehicleTrend"] }) {
 
   return (
     <div className="chart-wrap">
-      <svg className="trend" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Model yılı dağılımı">
+      <svg className="trend" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Model year distribution">
         <defs>
           <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="#66f2ad" stopOpacity=".34" />
@@ -110,7 +94,7 @@ function TrendChart({ data }: { data: Dashboard["vehicleTrend"] }) {
             <text x={point.x} y={height - 5} textAnchor="middle">
               {String(point.modelYear).slice(2)}
             </text>
-            <title>{point.modelYear}: {integer.format(point.count)} araç</title>
+            <title>{point.modelYear}: {integer.format(point.count)} vehicles</title>
           </g>
         ))}
       </svg>
@@ -160,7 +144,7 @@ function WashingtonMap({
 
   return (
     <div className="map-wrap">
-      <svg viewBox="0 0 640 320" role="img" aria-label="Washington EV ve şarj kapsama haritası">
+      <svg viewBox="0 0 640 320" role="img" aria-label="Washington electric vehicle and charging coverage map">
         {boundaries.features.map((feature) => {
           const region = byZip.get(feature.properties.zipCode);
           if (!region) return null;
@@ -181,16 +165,16 @@ function WashingtonMap({
               tabIndex={0}
               onKeyDown={(event) => event.key === "Enter" && onSelect(region)}
             >
-              <title>{region.city} {region.zipCode} · {integer.format(selectedVehicles(region))} EV · {region.publicPorts} port</title>
+              <title>{region.city} {region.zipCode} · {integer.format(selectedVehicles(region))} electric vehicles · {region.publicPorts} ports</title>
             </path>
           );
         })}
       </svg>
       <div className="map-legend multi">
-        <span className="legend-dot no-station" /> Kamuya açık port yok
-        <span className="legend-dot gap" /> Eyalet ortalamasının altında
-        <span className="legend-dot covered" /> Eyalet ortalamasının üzerinde
-        <span className="map-source">Census 2020 ZCTA · {boundaries.features.length}/{regions.length} ZIP eşleşti</span>
+        <span className="legend-dot no-station" /> No public charging ports
+        <span className="legend-dot gap" /> Below state average
+        <span className="legend-dot covered" /> Above state average
+        <span className="map-source">Census 2020 ZIP boundaries · {boundaries.features.length}/{regions.length} areas matched</span>
       </div>
     </div>
   );
@@ -202,27 +186,32 @@ function RegionDetail({ region, vehicleFilter }: { region: Region; vehicleFilter
     : vehicleFilter === "PHEV"
       ? region.phevVehicles
       : region.vehicles;
+  const coverageStatus = region.publicPorts === 0
+    ? "No public charging ports"
+    : region.coverageStatus === "Eyalet ortalamasının altında"
+      ? "Below state average"
+      : "Above state average";
   return (
     <aside className="region-detail">
-      <div className="region-count"><strong>{compact.format(vehicleCount)}</strong><span>{vehicleFilter === "ALL" ? "kayıtlı EV" : vehicleFilter}</span></div>
+      <div className="region-count"><strong>{compact.format(vehicleCount)}</strong><span>{vehicleFilter === "ALL" ? "registered vehicles" : vehicleFilter === "BEV" ? "battery electric" : "plug-in hybrid"}</span></div>
       <div>
         <span className="eyebrow">{region.zipCode} · {region.county} County</span>
         <h3>{region.city}</h3>
         <p>{region.coverageNote}</p>
       </div>
       <dl>
-        <div><dt>Kayıtlı EV</dt><dd>{integer.format(region.vehicles)}</dd></div>
-        <div><dt>Şarj sahası</dt><dd>{integer.format(region.chargingSites)}</dd></div>
-        <div><dt>Level 2 port</dt><dd>{integer.format(region.level2Ports)}</dd></div>
-        <div><dt>DC hızlı port</dt><dd>{integer.format(region.dcFastPorts)}</dd></div>
-        <div><dt>1.000 EV başına port</dt><dd>{decimal.format(region.portsPer1kVehicles)}</dd></div>
-        <div><dt>Port başına EV</dt><dd>{region.evPerPort === null ? "Port yok" : decimal.format(region.evPerPort)}</dd></div>
-        <div><dt>1.000 konut başına EV</dt><dd>{region.evPer1kHousing === null ? "—" : decimal.format(region.evPer1kHousing)}</dd></div>
-        <div><dt>Medyan gelir</dt><dd>{region.medianIncome === null ? "—" : dollars.format(region.medianIncome)}</dd></div>
-        <div><dt>Çok birimli konut</dt><dd>{region.multifamilyShare === null ? "—" : `%${decimal.format(region.multifamilyShare)}`}</dd></div>
-        <div><dt>Ortalama işe gidiş</dt><dd>{region.avgCommuteMinutes === null ? "—" : `${decimal.format(region.avgCommuteMinutes)} dk`}</dd></div>
+        <div><dt>Registered electric vehicles</dt><dd>{integer.format(region.vehicles)}</dd></div>
+        <div><dt>Charging sites</dt><dd>{integer.format(region.chargingSites)}</dd></div>
+        <div><dt>Level 2 charging ports</dt><dd>{integer.format(region.level2Ports)}</dd></div>
+        <div><dt>DC fast charging ports</dt><dd>{integer.format(region.dcFastPorts)}</dd></div>
+        <div><dt>Ports per 1,000 vehicles</dt><dd>{decimal.format(region.portsPer1kVehicles)}</dd></div>
+        <div><dt>Vehicles per port</dt><dd>{region.evPerPort === null ? "No ports" : decimal.format(region.evPerPort)}</dd></div>
+        <div><dt>Vehicles per 1,000 housing units</dt><dd>{region.evPer1kHousing === null ? "—" : decimal.format(region.evPer1kHousing)}</dd></div>
+        <div><dt>Median income</dt><dd>{region.medianIncome === null ? "—" : dollars.format(region.medianIncome)}</dd></div>
+        <div><dt>Multifamily housing</dt><dd>{region.multifamilyShare === null ? "—" : `%${decimal.format(region.multifamilyShare)}`}</dd></div>
+        <div><dt>Average commute</dt><dd>{region.avgCommuteMinutes === null ? "—" : `${decimal.format(region.avgCommuteMinutes)} min`}</dd></div>
       </dl>
-      <span className="segment">{region.coverageStatus}</span>
+      <span className="segment">{coverageStatus}</span>
     </aside>
   );
 }
@@ -256,7 +245,7 @@ function RangeBands({ rows }: { rows: Dashboard["rangeBands"] }) {
     <div className="range-bars">
       {rows.map((row) => (
         <div key={row.band}>
-          <span>{row.band === "Bilinmiyor" ? row.band : `${row.band} mil`}</span>
+          <span>{row.band === "Bilinmiyor" ? "Unknown" : `${row.band} miles`}</span>
           <div><i style={{ width: `${row.count / maximum * 100}%` }} /></div>
           <strong>{integer.format(row.count)}</strong>
         </div>
@@ -276,16 +265,16 @@ function IncomeScatter({ points }: { points: Dashboard["incomeScatter"] }) {
   const y = (value: number) => height - bottom - (value / maxEv) * (height - bottom - 18);
   return (
     <div className="scatter-wrap">
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Gelir ve konut başına EV dağılımı">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Gelir ve konut başına elektrikli araç dağılımı">
         <line x1={left} x2={left} y1="12" y2={height - bottom} className="axis" />
         <line x1={left} x2={width - 12} y1={height - bottom} y2={height - bottom} className="axis" />
         {points.map((point) => (
           <circle key={point.zipCode} cx={x(point.medianIncome)} cy={y(point.evPer1kHousing)} r="3.2" className="scatter-point">
-            <title>{point.city} {point.zipCode}: {dollars.format(point.medianIncome)} · {point.evPer1kHousing} EV/1K konut</title>
+            <title>{point.city} {point.zipCode}: {dollars.format(point.medianIncome)} · {point.evPer1kHousing} elektrikli araç / 1.000 konut</title>
           </circle>
         ))}
         <text x={width / 2} y={height - 4} textAnchor="middle">Medyan hane geliri</text>
-        <text transform={`translate(12 ${height / 2}) rotate(-90)`} textAnchor="middle">1.000 konut başına EV</text>
+        <text transform={`translate(12 ${height / 2}) rotate(-90)`} textAnchor="middle">1.000 konut başına elektrikli araç</text>
       </svg>
     </div>
   );
@@ -299,7 +288,7 @@ export default function App() {
   const [county, setCounty] = useState("ALL");
   const [vehicleFilter, setVehicleFilter] = useState<VehicleFilter>("ALL");
   const [query, setQuery] = useState("");
-  const [activeView, setActiveView] = useState<DashboardView>("overview");
+  const [activeView, setActiveView] = useState<DashboardView>("map");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -397,49 +386,36 @@ export default function App() {
             <span className="eyebrow">Washington eyaleti</span>
             <h1>Elektrikli araçlar ve<br /><em>şarj istasyonları</em></h1>
           </div>
-          <p>DOL araç kayıtları, 2024 AFDC şarj istasyonları ve 2024 Census göstergelerinin ZIP düzeyindeki özeti.</p>
-        </section>
-
-        <div className="demo-banner source-banner">
-          <strong>Kapsam</strong> Şarj toplamlarında yalnız Washington’daki aktif, kamuya açık elektrik istasyonları kullanıldı. Census sonuçları ilişki gösterir; neden-sonuç göstermez.
-        </div>
-
-        <section className="kpi-grid six">
-          <Kpi label="Washington EV filosu" value={compact.format(dashboard.summary.totalVehicles)} note="BEV + PHEV kayıtları" />
-          <Kpi label="BEV payı" value={`%${decimal.format(dashboard.summary.bevShare)}`} note="Tam elektrikli araç oranı" />
-          <Kpi label="Aktif kamu şarj sahası" value={compact.format(dashboard.summary.chargingSites)} note="2024 AFDC anlık görüntüsü" />
-          <Kpi label="Kamuya açık port" value={compact.format(dashboard.summary.publicPorts)} note={`${integer.format(dashboard.summary.dcFastPorts)} DC hızlı`} />
-          <Kpi label="Port başına EV" value={decimal.format(dashboard.summary.evPerPort)} note="Eyalet geneli gösterge" />
-          <Kpi label="Kamu portu olmayan ZIP" value={integer.format(dashboard.summary.zipsWithoutCharging)} note={`${dashboard.summary.belowAverageChargingZips} ZIP eyalet ortalamasının altında`} />
+          <p>Washington Department of Licensing araç kayıtları, 2024 Alternative Fuels Data Center şarj istasyonları ve 2024 Census göstergelerinin posta kodu düzeyindeki özeti.</p>
         </section>
 
         <section className="dashboard-grid">
           <article className="card map-card">
             <div className="section-head">
-              <div><span className="eyebrow">Coğrafi dağılım</span><h2>EV sayısı ve şarj kapsaması</h2></div>
-              <span className="live-dot">ZIP/ZCTA sınırları</span>
+              <div><span className="eyebrow">Geographic distribution</span><h2>Electric vehicle count and charging coverage</h2></div>
+              <span className="live-dot">ZIP boundaries</span>
             </div>
             <div className="map-filters">
               <label>
                 <span>County</span>
                 <select value={county} onChange={(event) => setCounty(event.target.value)}>
-                  <option value="ALL">Tümü</option>
+                  <option value="ALL">All</option>
                   {counties.map((item) => <option key={item} value={item}>{item}</option>)}
                 </select>
               </label>
               <label>
-                <span>Araç tipi</span>
+                <span>Vehicle type</span>
                 <select value={vehicleFilter} onChange={(event) => setVehicleFilter(event.target.value as VehicleFilter)}>
-                  <option value="ALL">BEV + PHEV</option>
-                  <option value="BEV">BEV</option>
-                  <option value="PHEV">PHEV</option>
+                  <option value="ALL">All electric vehicles</option>
+                  <option value="BEV">Battery electric vehicle</option>
+                  <option value="PHEV">Plug-in hybrid electric vehicle</option>
                 </select>
               </label>
               <label className="search-field">
-                <span>ZIP veya şehir</span>
-                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Örn. 98038 veya Seattle" />
+                <span>ZIP or city</span>
+                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="e.g. 98038 or Seattle" />
               </label>
-              <div className="filter-count"><strong>{filteredRegions.length}</strong><span>bölge</span></div>
+              <div className="filter-count"><strong>{filteredRegions.length}</strong><span>areas</span></div>
             </div>
             <div className="map-layout">
               <WashingtonMap
@@ -456,23 +432,22 @@ export default function App() {
 
           <article className="card trend-card">
             <div className="section-head">
-              <div><span className="eyebrow">Mevcut filo</span><h2>Model yılı dağılımı</h2></div>
-              <span className="method-tag">Kayıt trendi değildir</span>
+              <div><span className="eyebrow">Current fleet</span><h2>Model year distribution</h2></div>
             </div>
             <TrendChart data={dashboard.vehicleTrend} />
-            <p className="chart-note">Mevcut kayıtlı filonun model yıllarıdır; geçmiş yıllardaki kayıt sayısını göstermez.</p>
+            <p className="chart-note">This shows model years in the current registered fleet; it is not a historical registration trend.</p>
           </article>
 
           <article className="card mix-card">
-            <div className="section-head"><div><span className="eyebrow">Araç teknolojisi</span><h2>BEV / PHEV karması</h2></div></div>
+            <div className="section-head"><div><span className="eyebrow">Vehicle technology</span><h2>Battery electric / plug-in hybrid mix</h2></div></div>
             <div className="donut" style={{ "--bev": `${dashboard.summary.bevShare * 3.6}deg` } as CSSProperties}>
-              <div><strong>%{decimal.format(dashboard.summary.bevShare)}</strong><span>BEV</span></div>
+              <div><strong>%{decimal.format(dashboard.summary.bevShare)}</strong><span>battery electric</span></div>
             </div>
             <div className="mix-legend">
               {dashboard.powertrain.map((item) => (
                 <div key={item.type}>
                   <span className={item.type.toLowerCase()} />
-                  <b>{item.type}</b>
+                  <b>{item.type === "BEV" ? "Battery electric" : item.type === "PHEV" ? "Plug-in hybrid" : "Other"}</b>
                   <small>{integer.format(item.count)} · %{((item.count / totalPowertrain) * 100).toFixed(1)}</small>
                 </div>
               ))}
@@ -480,17 +455,17 @@ export default function App() {
           </article>
 
           <article className="card brands-card">
-            <div className="section-head"><div><span className="eyebrow">Araç pazarı</span><h2>Öne çıkan markalar</h2></div></div>
+            <div className="section-head"><div><span className="eyebrow">Vehicle market</span><h2>Top makes</h2></div></div>
             <Bars rows={dashboard.brands} label="make" value="count" />
           </article>
 
           <article className="card brands-card">
-            <div className="section-head"><div><span className="eyebrow">Araç pazarı</span><h2>Öne çıkan modeller</h2></div></div>
+            <div className="section-head"><div><span className="eyebrow">Vehicle market</span><h2>Top models</h2></div></div>
             <Bars rows={dashboard.models} label="model" value="count" />
           </article>
 
           <article className="card mix-card charging-card">
-            <div className="section-head"><div><span className="eyebrow">Şarj teknolojisi</span><h2>Level 2 / DC Fast</h2></div></div>
+            <div className="section-head"><div><span className="eyebrow">Şarj teknolojisi</span><h2>Orta hızlı / hızlı şarj portları</h2></div></div>
             <div className="donut charging" style={{ "--bev": `${level2Share * 3.6}deg` } as CSSProperties}>
               <div><strong>{compact.format(dashboard.summary.publicPorts)}</strong><span>toplam port</span></div>
             </div>
@@ -498,7 +473,7 @@ export default function App() {
               {dashboard.chargingMix.map((item) => (
                 <div key={item.type}>
                   <span className={item.type === "DC Fast" ? "dc" : "level2"} />
-                  <b>{item.type}</b>
+                  <b>{item.type === "DC Fast" ? "Hızlı şarj" : "Orta hızlı şarj"}</b>
                   <small>{integer.format(item.count)} port</small>
                 </div>
               ))}
@@ -514,22 +489,20 @@ export default function App() {
         <section className="range-grid">
           <article className="card range-card range-distribution">
             <div className="section-head">
-              <div><span className="eyebrow">Kayıtlardaki menzil</span><h2>Elektrikli menzil dağılımı</h2></div>
-              <span>0 değeri bilinmiyor sayıldı</span>
+              <div><span className="eyebrow">Recorded range</span><h2>Electric range distribution</h2></div>
             </div>
             <RangeBands rows={dashboard.rangeBands} />
-            <p className="chart-note">Karşılaştırmalar yalnız menzil alanı dolu kayıtlardan hesaplandı. Alanı 0 veya boş olan kayıtlar “Bilinmiyor” grubunda gösterildi.</p>
+            <p className="chart-note">Range comparisons use only records with a valid range value. Records with 0 or blank range are grouped as “Unknown”.</p>
           </article>
 
           <article className="card range-card">
-            <div className="section-head"><div><span className="eyebrow">Araç tipi</span><h2>BEV ve PHEV menzili</h2></div></div>
+            <div className="section-head"><div><span className="eyebrow">Vehicle type</span><h2>Battery electric and hybrid vehicle range</h2></div></div>
             <div className="range-summary">
               {dashboard.rangeByPowertrain.map((item) => (
                 <div key={item.type}>
-                  <span>{item.type}</span>
-                  <strong>{decimal.format(item.medianRange)} mil</strong>
-                  <small>Medyan · {integer.format(item.knownCount)} kayıt</small>
-                  <i>Kayıtların %{decimal.format(item.knownShare)}’inde menzil var</i>
+                  <span>{item.type === "BEV" ? "Battery electric" : "Plug-in hybrid"}</span>
+                  <strong>{decimal.format(item.medianRange)} miles</strong>
+                  <small>Median · {integer.format(item.knownCount)} records</small>
                 </div>
               ))}
             </div>
@@ -537,15 +510,14 @@ export default function App() {
 
           <article className="card range-card range-brands">
             <div className="section-head">
-              <div><span className="eyebrow">Marka karşılaştırması</span><h2>Bilinen medyan menzil</h2></div>
-              <span>En az 100 dolu kayıt</span>
+              <div><span className="eyebrow">Make comparison</span><h2>Known median range</h2></div>
             </div>
             <div className="range-brand-list">
               {dashboard.rangeByBrand.map((item) => (
                 <div key={item.make}>
                   <strong>{item.make}</strong>
-                  <span>{decimal.format(item.medianRange)} mil</span>
-                  <small>{integer.format(item.knownCount)} kayıt · %{decimal.format(item.knownShare)} doluluk</small>
+                  <span>{decimal.format(item.medianRange)} miles</span>
+                  <small>{integer.format(item.knownCount)} records</small>
                 </div>
               ))}
             </div>
@@ -555,11 +527,11 @@ export default function App() {
         <section className="census-grid">
           <article className="card scatter-card">
             <div className="section-head">
-              <div><span className="eyebrow">2024 Census</span><h2>Gelir ve konut başına EV</h2></div>
+              <div><span className="eyebrow">2024 Census</span><h2>Gelir ve konut başına elektrikli araç</h2></div>
               <span>Üst %1 aykırı değer hariç</span>
             </div>
             <IncomeScatter points={dashboard.incomeScatter} />
-            <p className="chart-note">Her nokta bir ZIP/ZCTA eşleşmesidir. Gelir yükseldikçe 1.000 konut başına kayıtlı EV sayısı da genel olarak yükseliyor.</p>
+            <p className="chart-note">Her nokta bir posta kodu bölgesidir. Gelir yükseldikçe 1.000 konut başına kayıtlı elektrikli araç sayısı da genel olarak yükseliyor.</p>
           </article>
 
           <article className="card correlation-card">
@@ -576,13 +548,13 @@ export default function App() {
           </article>
 
           <article className="card income-card">
-            <div className="section-head"><div><span className="eyebrow">Gelir grupları</span><h2>EV yoğunluğu karşılaştırması</h2></div></div>
+            <div className="section-head"><div><span className="eyebrow">Gelir grupları</span><h2>Elektrikli araç yoğunluğu karşılaştırması</h2></div></div>
             <div className="income-groups">
               {dashboard.incomeGroups.map((group) => (
                 <div key={group.group}>
                   <span>{group.group}</span>
                   <strong>{group.medianEvPer1kHousing}</strong>
-                  <small>1.000 konut başına EV</small>
+                  <small>1.000 konut başına elektrikli araç</small>
                   <i>Medyan gelir {dollars.format(group.medianIncome)}</i>
                 </div>
               ))}
@@ -592,12 +564,12 @@ export default function App() {
 
         <section className="card table-card">
           <div className="section-head">
-            <div><span className="eyebrow">Şarj kapsaması</span><h2>Filtrelenen ZIP bölgeleri</h2></div>
+            <div><span className="eyebrow">Şarj kapsaması</span><h2>Filtrelenen posta kodu bölgeleri</h2></div>
             <span>Portu olmayan bölgeler önce gösterilir</span>
           </div>
           <div className="table-scroll">
             <table>
-              <thead><tr><th>Bölge</th><th>Durum</th><th>EV</th><th>Saha</th><th>Level 2</th><th>DC Fast</th><th>EV / 1K konut</th><th>Medyan gelir</th></tr></thead>
+              <thead><tr><th>Bölge</th><th>Durum</th><th>Elektrikli araç</th><th>Şarj sahası</th><th>Orta hızlı port</th><th>Hızlı port</th><th>1.000 konut başına araç</th><th>Medyan gelir</th></tr></thead>
               <tbody>
                 {filteredRegions.slice(0, 12).map((region) => (
                   <tr key={region.zipCode} onClick={() => setSelectedZip(region.zipCode)}>
@@ -612,7 +584,7 @@ export default function App() {
                   </tr>
                 ))}
                 {filteredRegions.length === 0 && (
-                  <tr className="empty-row"><td colSpan={8}>Bu filtrelerle eşleşen ZIP bulunamadı.</td></tr>
+                  <tr className="empty-row"><td colSpan={8}>Bu filtrelerle eşleşen posta kodu bölgesi bulunamadı.</td></tr>
                 )}
               </tbody>
             </table>
@@ -621,12 +593,12 @@ export default function App() {
 
         <section className="card table-card county-card">
           <div className="section-head">
-            <div><span className="eyebrow">County karşılaştırması</span><h2>En büyük 15 EV pazarı</h2></div>
-            <span>EV sayısına göre sıralı</span>
+            <div><span className="eyebrow">County karşılaştırması</span><h2>En büyük 15 elektrikli araç pazarı</h2></div>
+            <span>Elektrikli araç sayısına göre sıralı</span>
           </div>
           <div className="table-scroll">
             <table>
-              <thead><tr><th>County</th><th>EV</th><th>Şarj sahası</th><th>Toplam port</th><th>DC Fast</th><th>Port başına EV</th><th>Medyan gelir</th></tr></thead>
+              <thead><tr><th>County</th><th>Elektrikli araç</th><th>Şarj sahası</th><th>Toplam port</th><th>Hızlı port</th><th>Port başına araç</th><th>Medyan gelir</th></tr></thead>
               <tbody>
                 {dashboard.counties.map((county) => (
                   <tr key={county.county}>

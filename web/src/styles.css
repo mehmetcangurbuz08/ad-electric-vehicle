@@ -1068,8 +1068,6 @@ td:first-child span {
   display: none;
 }
 
-.dashboard-shell main > .source-banner,
-.dashboard-shell main > .kpi-grid,
 .dashboard-shell main > .dashboard-grid,
 .dashboard-shell main > .range-grid,
 .dashboard-shell main > .census-grid,
@@ -1077,14 +1075,6 @@ td:first-child span {
 .dashboard-shell main > .quality-grid,
 .dashboard-shell main > .sources-card {
   display: none;
-}
-
-.view-overview main > .source-banner {
-  display: block;
-}
-
-.view-overview main > .kpi-grid {
-  display: grid;
 }
 
 .view-map main > .dashboard-grid,
