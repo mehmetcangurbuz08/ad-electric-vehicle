@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+﻿import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { getDashboard } from "./api";
 import type { Dashboard, Region, ZctaFeatureCollection } from "./types";
 
@@ -17,7 +17,7 @@ const navItems: Array<{ id: DashboardView; label: string; title: string; descrip
   {
     id: "overview",
     label: "Özet",
-    title: "Washington EV Dashboard",
+    title: "Genel Özet",
     description: "DOL araç kayıtları, AFDC şarj istasyonları ve 2024 Census göstergelerinin ZIP düzeyindeki özeti.",
   },
   {
@@ -52,9 +52,9 @@ const navItems: Array<{ id: DashboardView; label: string; title: string; descrip
   },
   {
     id: "notes",
-    label: "Veri Notları",
-    title: "Veri kalitesi ve kaynaklar",
-    description: "Kapsam, sınırlılıklar, kaynaklar ve çıktı tarihi.",
+    label: "Kaynakça",
+    title: "Kaynakça",
+    description: "Dashboard'da kullanılan veri setleri.",
   },
 ];
 
@@ -371,7 +371,7 @@ export default function App() {
   return (
     <div className={`dashboard-shell view-${activeView}`}>
       <aside className="sidebar">
-        <div className="brand-mark"><span>EV</span><div>Washington<strong>Dashboard</strong></div></div>
+        <div className="sidebar-title">Dashboard</div>
         <nav>
           {navItems.map((item) => (
             <button
@@ -384,20 +384,8 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <div className="sidebar-meta">
-          <span className="mode live">Gerçek veri</span>
-          <small>{dashboard.metadata.geography}</small>
-        </div>
       </aside>
       <div className="app-shell">
-      <header>
-        <div className="brand-mark"><span>EV</span><div>Washington<strong>Veri Analizi</strong></div></div>
-        <div className="header-meta">
-          <span className="mode live">Gerçek veri</span>
-          <span>{dashboard.metadata.geography}</span>
-        </div>
-      </header>
-
       <main>
         <section className="page-title">
           <span className="eyebrow">Washington eyaleti</span>
@@ -656,45 +644,21 @@ export default function App() {
           </div>
         </section>
 
-        <section className="quality-grid">
-          <article className="card quality-card">
-            <span className="eyebrow">Veri kalitesi</span><h2>Analizin sınırları görünür</h2>
-            <div className="quality-stats">
-              <div><strong>%{dashboard.dataQuality.knownRangeShare}</strong><span>Menzili bilinen EV kaydı</span></div>
-              <div><strong>{dashboard.dataQuality.medianKnownRange} mil</strong><span>Bilinen menzillerin medyanı</span></div>
-              <div><strong>{dashboard.dataQuality.zipCount}</strong><span>EV bulunan ZIP</span></div>
-              <div><strong>{dashboard.dataQuality.stationZipCount}</strong><span>Aktif kamu şarjı bulunan ZIP</span></div>
-              <div><strong>{dashboard.dataQuality.censusMatchedZips}</strong><span>Census ile eşleşen ZIP/ZCTA</span></div>
-              <div><strong>{dashboard.dataQuality.completeCensusZips}</strong><span>Temel Census alanları tam bölge</span></div>
-            </div>
-          </article>
-          <article className="card caveat-card">
-            <span className="eyebrow">Notlar</span><h2>Sonuçları nasıl okumalıyız?</h2>
-            <ul>{dashboard.metadata.caveats.map((caveat) => <li key={caveat}>{caveat}</li>)}</ul>
-          </article>
-        </section>
-
         <section className="card sources-card">
           <div className="section-head">
-            <div><span className="eyebrow">Kaynaklar</span><h2>Veri ve tarih bilgisi</h2></div>
-            <span>Çıktı: {new Date(dashboard.metadata.generatedAt).toLocaleString("tr-TR")}</span>
+            <div><h2>Kullanılan veri kaynakları</h2></div>
           </div>
           <div className="source-list">
             {dashboard.sources.map((source) => (
               <div key={source.name}>
                 <a href={source.url} target="_blank" rel="noreferrer">{source.name}</a>
                 <span>{source.period}</span>
-                <p>{source.usage}</p>
               </div>
             ))}
           </div>
         </section>
       </main>
 
-      <footer>
-        <span>Washington Elektrikli Araç Analizi · Veri sözleşmesi v{dashboard.schemaVersion}</span>
-        <span>AFDC son güncelleme: {new Date(dashboard.dataQuality.latestStationUpdate).toLocaleDateString("tr-TR")}</span>
-      </footer>
       </div>
     </div>
   );

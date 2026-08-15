@@ -881,15 +881,6 @@ td:first-child span {
   color: var(--muted);
 }
 
-footer {
-  display: flex;
-  justify-content: space-between;
-  padding: 18px 0 26px;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 11px;
-}
-
 .status {
   min-height: 100vh;
   display: grid;
@@ -999,6 +990,14 @@ footer {
   border-bottom: 1px solid var(--line-soft);
 }
 
+.sidebar-title {
+  padding: 0 6px 12px;
+  color: var(--text);
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 16px;
+  font-weight: 700;
+}
+
 .sidebar nav {
   display: grid;
   gap: 4px;
@@ -1026,19 +1025,6 @@ footer {
   font-weight: 700;
 }
 
-.sidebar-meta {
-  display: grid;
-  gap: 8px;
-  margin-top: auto;
-  padding: 12px 6px 0;
-  border-top: 1px solid var(--line-soft);
-}
-
-.sidebar-meta small {
-  color: var(--muted);
-  line-height: 1.4;
-}
-
 .dashboard-shell .app-shell {
   width: 100%;
   max-width: none;
@@ -1051,13 +1037,17 @@ footer {
 }
 
 .dashboard-shell .app-shell > header {
-  justify-content: flex-end;
+  display: none;
 }
 
 .page-title {
   margin-bottom: 16px;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--line-soft);
+}
+
+.page-title .eyebrow {
+  display: none;
 }
 
 .page-title h1 {
@@ -1124,8 +1114,7 @@ footer {
 }
 
 .view-vehicles main > .range-grid,
-.view-census main > .census-grid,
-.view-notes main > .quality-grid {
+.view-census main > .census-grid {
   display: grid;
 }
 
@@ -1161,10 +1150,6 @@ footer {
     width: auto;
     min-width: 92px;
     text-align: center;
-  }
-
-  .sidebar-meta {
-    display: none;
   }
 
   .dashboard-shell .app-shell {
